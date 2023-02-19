@@ -1,1 +1,1 @@
-# Machine Learning in R
+# Statistical Analysis and Machine Learning in R
