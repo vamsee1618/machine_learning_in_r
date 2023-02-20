@@ -1,0 +1,571 @@
+---
+title: "BAX-400 Homework 2"
+subtitle: "Summer 2022 Section 2"
+author:
+- Vamsee Krishna Reddy Narahari
+output: html_document
+date: '2022-08-17'
+---
+
+```{r setup, include=FALSE}
+options(warn=-1) ##Ignoring the warnings
+knitr::opts_chunk$set(echo = TRUE)
+#load required libraries
+list.of.packages <- c("ggplot2", "readr","dplyr","psych","data.table","knitr","kableExtra","tidyverse","lubridate","gmodels","gridExtra","reshape2")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
+
+library("readr")
+library("dplyr")
+library("psych")
+library("ggplot2")
+library("data.table")
+library("knitr")
+library("kableExtra")
+library("tidyverse")
+library("lubridate")
+library("gmodels")
+library("gridExtra")
+library("reshape2")
+```
+
+## Question - 1
+```{r question_1_given, echo=FALSE}
+cat("Wheel of forune is from 0 to 1000 dollars with increments of 1 dollar. The winnings are decided based upon the average of all the spin values from a sample")
+```
+
+# 1.a 
+```{r question_1a}
+wheel <- seq(0,1000,by=1)
+
+true_mean <- mean(wheel)
+true_sd <- sd(wheel)
+```
+
+```{r question_1a_output, echo=FALSE}
+sprintf("The theoretical mean and theoretical standard deviation of the winnings are %.3f and %.3f",true_mean,true_sd)
+```
+
+# 1.b
+```{r question_1b}
+replicating_function <- function(spins){
+                                        t(matrix(replicate(1000, {samp <- sample(wheel, spins, replace = TRUE)}),nrow=spins))
+}
+
+for(i in 1:10){
+  assign(paste0("spins_", i),replicating_function(i))
+}
+head(spins_6,1)
+head(spins_7,1)
+```
+
+# 1.c
+```{r question_1c}
+spins_means_1 <- rowMeans(spins_1)
+spins_means_2 <- rowMeans(spins_2)
+spins_means_3 <- rowMeans(spins_3)
+spins_means_4 <- rowMeans(spins_4)
+spins_means_5 <- rowMeans(spins_5)
+spins_means_6 <- rowMeans(spins_6)
+spins_means_7 <- rowMeans(spins_7)
+spins_means_8 <- rowMeans(spins_8)
+spins_means_9 <- rowMeans(spins_9)
+spins_means_10 <- rowMeans(spins_10)
+
+means_dataframe <- data.frame(spins_means_1,spins_means_2,spins_means_3,spins_means_4,spins_means_5,spins_means_6,spins_means_7,spins_means_8,spins_means_9,spins_means_10)
+
+head(means_dataframe,2)
+
+```
+
+# 1.d
+```{r question_1d}
+winnings_mean_samplemeans <- colMeans(means_dataframe[sapply(means_dataframe, is.numeric)]) 
+
+```
+
+```{r question_1d_output, echo=FALSE}
+cat("The means of all the spin categories is \n",winnings_mean_samplemeans)
+
+```
+
+# 1.e
+```{r question_1e}
+winnings_sd_means <- sapply(means_dataframe, sd, na.rm = TRUE)
+```
+
+```{r question_1e_output}
+cat("The standard deviations of all the spin categories is: \n",winnings_sd_means)
+```
+
+
+# 1.f
+```{r question_1f, figures-side, fig.show="hold", out.width="50%"}
+ggplot(means_dataframe, aes(x=spins_means_1)) + geom_histogram(binwidth = 50) + ggtitle("1 spin Distribution") + xlab("Winnings") + ylab("Frequency")
+ggplot(means_dataframe, aes(x=spins_means_2)) + geom_histogram(binwidth = 50) + ggtitle("2 spin Distribution") + xlab("Winnings") + ylab("Frequency")
+ggplot(means_dataframe, aes(x=spins_means_3)) + geom_histogram(binwidth = 50) + ggtitle("3 spin Distribution") + xlab("Winnings") + ylab("Frequency")
+ggplot(means_dataframe, aes(x=spins_means_4)) + geom_histogram(binwidth = 50) + ggtitle("4 spin Distribution") + xlab("Winnings") + ylab("Frequency")
+ggplot(means_dataframe, aes(x=spins_means_5)) + geom_histogram(binwidth = 50) + ggtitle("5 spin Distribution") + xlab("Winnings") + ylab("Frequency")
+ggplot(means_dataframe, aes(x=spins_means_6)) + geom_histogram(binwidth = 50) + ggtitle("6 spin Distribution") + xlab("Winnings") + ylab("Frequency")
+ggplot(means_dataframe, aes(x=spins_means_7)) + geom_histogram(binwidth = 50) + ggtitle("7 spin Distribution") + xlab("Winnings") + ylab("Frequency")
+ggplot(means_dataframe, aes(x=spins_means_8)) + geom_histogram(binwidth = 50) + ggtitle("8 spin Distribution") + xlab("Winnings") + ylab("Frequency")
+ggplot(means_dataframe, aes(x=spins_means_9)) + geom_histogram(binwidth = 50) + ggtitle("9 spin Distribution") + xlab("Winnings") + ylab("Frequency")
+ggplot(means_dataframe, aes(x=spins_means_10)) + geom_histogram(binwidth = 50) + ggtitle("10 spin Distribution") + xlab("Winnings") + ylab("Frequency")
+
+```
+
+```{r question_1f_output, echo=FALSE}
+cat("The shape of the distributions from 1 to 10 sample sizes is becoming bell curve i.e. by increasing the sample size would increase the normality of the sample means. While the sample size is increasing the distrubution of the curve approximating to Normal distrbution i.e. CLT theorem")
+```
+
+
+# 1.g
+```{r question_1g}
+the_std_error <- c()
+for(std in 1:10){
+  the_std_error[std] <- true_sd/sqrt(std)
+}
+```
+
+```{r question_1g_ouput, echo=FALSE}
+cat("The theoretical standard error for each category of spins:\n",the_std_error)
+```
+
+# 1.h
+```{r question_1h,}
+spin_frequency <- 1:10
+question_1h_df <- data.frame(spin_frequency,true_mean,winnings_mean_samplemeans)
+question_1h_df$difference_means <- question_1h_df$true_mean - question_1h_df$winnings_mean_samplemeans
+cat("Comparison of the theoretical mean with sample means\n")
+```
+
+
+```{r question_1h_output, echo=FALSE}
+kbl(question_1h_df) %>%
+  kable_styling("striped", full_width = T) %>% 
+ scroll_box( height = "375px")
+```
+
+
+```{r question_1h_output2, echo=FALSE}
+cat("The means of the sample means of all the distributions are really close to the true mean")
+```
+
+# 1.i 
+```{r question_1i_output}
+question_1i_df <- data.frame(spin_frequency,winnings_sd_means,the_std_error)
+question_1i_df$difference_sd <- question_1i_df$winnings_sd_means - question_1i_df$the_std_error
+```
+
+```{r question_1i_output2, echo=FALSE}
+cat("Comparison of the theoretical standard deviations with sample standard deviations")
+```
+
+```{r question_1i_output3, echo=FALSE}
+question_1i_df
+```
+
+
+# 1.j
+```{r question_1j}
+prob_600_winnings <- c()
+for(i in 1:10){
+prob_600_winnings[i] <- pnorm(q=600, mean = winnings_mean_samplemeans[i], sd=winnings_sd_means[i], lower.tail = FALSE)
+}
+
+```
+
+```{r question_1j_output, echo=FALSE}
+cat("The probability of having greater than 600 in winnings is:")
+
+```
+
+```{r question1j_output2, echo=FALSE}
+data.frame(spin_frequency,prob_600_winnings)
+```
+
+
+# 1.k
+```{r question_1k}
+question_1_results<-rbind(true_mean,round(winnings_mean_samplemeans,3),round(winnings_sd_means,3),round(the_std_error,3),round(prob_600_winnings,3)) 
+colnames(question_1_results) <- c(1,2,3,4,5,6,7,8,9,10)
+rownames(question_1_results) <- c("Theoretical mean","Mean of Sample Means","Theoretical Standard Error","Standard Deviation of Sample Means","P(winning>$600)")
+kbl(question_1_results) %>%
+  kable_styling("striped", full_width = T) %>% 
+ scroll_box( height = "375px")
+
+```
+
+```{r question_1k_output, echo=FALSE}
+cat("1. The means of the sample means are close to theoretical mean as expected because the samples collected are random in nature and it would contain the true population mean.\n2. The standard deviation of sample means are decreasing as we increase the number of samples because the means are approximating the normal distribution i.e. the variability of the means would decrease while we increase the number of samples in sampling distribution\n3. The probability of winning more than 600 dollars is decreasing due to decrease in the variability and standard deviation from the true mean i.e. 500, the chances of getting 600 dollars in winning decrease as we take more number of samples")
+
+```
+
+## Question 2
+```{r question2_given, echo=FALSE}
+cat("The transactions of a super market has been provided over a period of 2 years with the data of Customer, Product and transaction details")
+```
+
+```{r question2_loaddata}
+sup_mar_tran <- read.csv("SupermarketTrans.csv")
+```
+
+```{r question2_summary}
+sup_mar_tran$Revenue <- parse_number(sup_mar_tran$Revenue) 
+```
+# 2.a
+```{r question2_a, figures-side, fig.show="hold", out.width="50%"}
+product_family_transactions <- sup_mar_tran %>% 
+                          group_by(Product.Family) %>% 
+                          summarize(count_transactions=length(Transaction))
+
+
+ggplot(product_family_transactions, aes(reorder(x=count_transactions,-count_transactions), y=count_transactions)) + geom_bar(stat="sum") + ggtitle("Product Family wise Transactions") + xlab("Product Family") + ylab("Transactions Count") + theme(legend.position = "none")
+
+ggplot(sup_mar_tran, aes(x=Product.Family,y=Revenue)) + geom_boxplot(outlier.colour="red") + labs(title="Revenue boxplots across Product Family",x="Product Family",y="Revenue") 
+```
+
+```{r question_2a_output, echo=FALSE}
+cat("From the above bar graph, we can see that the proportion of the food transactions is relatively so large than the other two. So if we take random sampling from the dataset, we might miss out on the true population which is consisting mostly of food items. Therefore we need to take stratified proportion sampling for capturing the true mean and variability of the population. But I think the data variability of the revenues across product families from the box-plot is not much varied")
+
+```
+# 2.b
+```{r question_2b}
+product_family_transactions$proportion <- product_family_transactions$count_transactions/sum(product_family_transactions$count_transactions)
+product_family_transactions$samples <- round(product_family_transactions$proportion * 250)
+```
+
+```{r question_2b_output, echo=FALSE}
+cat("The transactions from each sample in case of stratified sample proportion is:\n")
+kbl(product_family_transactions[c("Product.Family","samples")]) %>%
+  kable_styling("striped", full_width = T)
+```
+
+
+# 2.c
+```{r question_2c}
+drink_sample <- filter(sup_mar_tran,Product.Family=="Drink")[sample(nrow(filter(sup_mar_tran,Product.Family=="Drink")), 22), ]
+food_sample <- filter(sup_mar_tran,Product.Family=="Food")[sample(nrow(filter(sup_mar_tran,Product.Family=="Drink")), 181), ]
+nonc_sample <- filter(sup_mar_tran,Product.Family=="Non-Consumable")[sample(nrow(filter(sup_mar_tran,Product.Family=="Drink")), 47), ]
+
+samplemean_drink <- mean(drink_sample$Revenue)
+samplemean_food <- mean(food_sample$Revenue)
+samplemean_nonc <- mean(nonc_sample$Revenue)
+
+samplesd_drink <- sd(drink_sample$Revenue)
+samplesd_food <- sd(food_sample$Revenue)
+samplesd_nonc <- sd(nonc_sample$Revenue)
+```
+
+```{r question_2c_output, echo=FALSE}
+sprintf("The sample means & standard deviations for drink, food and non consumables are %.3f and %.3f,%.3f and %.3f,%.3f and %.3f",samplemean_drink,samplesd_drink,samplemean_food,samplesd_food,samplemean_nonc,samplesd_nonc)
+
+```
+## Question-3
+
+```{r question_3_given, echo=FALSE}
+cat("Given: A consulting firm built a system for invoice processing which reduces the payments times by 50 percent. A study from existing population showed that the times has a standard deviation of 4.2 days\nTo do: Evaluate the performance of the new billing system")
+```
+
+```{r quetion3_loaddata}
+billing <- read.csv("PaymentTimes.csv")
+head(billing,1)
+```
+
+# 3.a
+
+```{r question_3a}
+sample_mean_time <- mean(billing$PayTime)
+
+### Sample Size
+sample_size <- nrow(billing)
+
+### Population Std. Dev.
+pop_time_sd <- 4.2
+
+### For 95% confidence... 
+z_time_95 <- qnorm(0.975, mean = 0, sd = 1, lower.tail = TRUE)
+
+### 95% Confidence Interval
+lcl_time_95 <- round(sample_mean_time - (z_time_95*pop_time_sd/sqrt(sample_size)),3)
+ucl_time_95 <- round(sample_mean_time + (z_time_95*pop_time_sd/sqrt(sample_size)),3)
+
+```
+
+```{r question_3a_output, echo=FALSE}
+cat("At 95% confidence interval, the lower and upper limits of the sample are",lcl_time_95,"and",ucl_time_95,".Since the upper limit is less than the 19.5 days we can say that at 95% confidence interval the billing system was effective.")
+```
+# 3.b
+```{r question_3b}
+### For 95% confidence... 
+z_time_99 <- qnorm(0.995, mean = 0, sd = 1, lower.tail = TRUE)
+
+### 95% Confidence Interval
+lcl_time_99 <- round(sample_mean_time - (z_time_99*pop_time_sd/sqrt(sample_size)),3)
+ucl_time_99 <- round(sample_mean_time + (z_time_99*pop_time_sd/sqrt(sample_size)),3)
+```
+
+```{r question_3b_output, echo=FALSE}
+cat("At 99% confidence interval, the lower and upper limits of the sample are",lcl_time_99,"and",ucl_time_99,".Since the upper limit is less than the 19.5 days we can say that at 99% confidence interval the billing system was effective.")
+```
+
+# 3.c
+```{r question_3c}
+pnorm(q=18.1077, mean=19.5, sd=4.2/sqrt(65), lower.tail = TRUE)
+```
+```{r question_3_inf, echo=FALSE}
+cat("Since the probability of payment time having less than 18.077 is very low and when we decrease the population mean the probability would increase. From the mean of the samples provided the true population mean is less than 19.5 days")
+```
+
+
+## Question-4
+```{r question_4_given, echo=FALSE}
+cat("Given: The service times of a toll booth at NYS thruway are exponentially distributed with a mean of 2.7 minutes\nTo Do: Find out proportion of cars that can go through the booth in less than 3 minutes")
+```
+
+```{r question4}
+car_prop <- pexp(q=3,rate=2.7,lower.tail = TRUE)
+```
+ 
+```{r question4_output, echo=FALSE}
+sprintf("The proportion of cars can get through the toll booth in less than 3 minutes is %.5f. Although mean is 2.7 minutes the probability of a completing a car service is not yet 1 in less than 3 minutes",car_prop)
+
+```
+## Question-5
+```{r question5_given, echo=FALSE}
+cat("Given: Leslie swims 100 yards on average in 62 seconds with standard deviation of 2 seconds\nTo Do:Find probability of Leslie swims under one minutes only 2 times out of five races")
+
+```
+
+```{r question5}
+swim_under_min_prob <- pnorm(q=60,mean=62,sd=2,lower.tail = TRUE) #Continuous normal distribution where time taken for swim to complete
+swim_twice_under_min_prob <- dbinom(x=2,size=5,prob = swim_under_min_prob) #Out of 5 trials only 2 has to be successful (Complete the race under 60 mins) and probability for that success calculated above
+
+```
+
+```{r question5_output, echo=FALSE}
+sprintf("The probability that Leslie will swim under a minute exactly twice out of her next five races is %.3f",swim_twice_under_min_prob)
+
+```
+
+## Question-6
+```{r question6_given, echo=FALSE}
+cat("Given: The IRS reviewing 4 returns out of 25 samples. Out of 25 5 have more than 1000 dollar donation.\nTo Do:Find probabilities number towards the required number of pickings")
+```
+
+# 6.a
+```{r question_6a}
+## N=25, S=5, N-S=20, n=4, x=1
+char_ded_1 <- dhyper(x=1,m=5,n=20,k=4)
+```
+
+```{r question_6a_output, echo=FALSE}
+sprintf("The probability exactly one of the four audited had a charitable deduction of more than $1,000 is %.3f",char_ded_1)
+
+```
+
+
+# 6.b
+```{r question_6b}
+char_ded_mor_1 <- phyper(q=0,m=5,n=20,k=4,lower.tail = FALSE)
+
+```
+
+```{r question_6b_output, echo=FALSE}
+sprintf("The probability at least one of the audited returns had a charitable contribution of more than $1,000 is %.3f",char_ded_mor_1)
+
+```
+## Question 7
+```{r question7_given, echo=FALSE}
+cat("Given: Mercedes automobile sales follow a poisson distribution with a mean of three per day\nTo do: Find probabilities of particular instances")
+```
+
+# 7.a 
+```{r question_7a}
+no_merc_day <- dpois(x=0, lambda = 3)
+
+```
+
+```{r question_7a_outut, echo=FALSE}
+sprintf("The probability that no Mercedes is sold on a particular day is %.3f",no_merc_day)
+
+```
+
+# 7.b
+```{r question_7b}
+merc_1_5 <- ppois(q=0,lambda=3,lower.tail=FALSE)^5
+```
+
+```{r question_7b_output, echo=FALSE}
+sprintf("The probability that for five consecutive days at least one Mercedes sold is %.3f",merc_1_5)
+```
+
+## Question 8
+```{r question8_given, echo=FALSE}
+cat("The shoplifting sensor at a certain Best Buy Electronics store exit gives an alarm 0.5 times a minute.")
+```
+
+# 8.a
+```{r question8_a}
+median_wait_time <- qexp(0.5, rate=0.5, lower.tail = TRUE)
+```
+
+```{r question_8a_output, echo=FALSE}
+sprintf("The median waiting time until the next alarm is %.3f minutes",median_wait_time)
+
+```
+
+# 8.b
+```{r question8_b}
+q1_wait_time <- qexp(0.25, rate=0.5, lower.tail = TRUE)
+```
+
+```{r question8_b_output, echo=FALSE}
+sprintf("The first quartile of waiting time before the next alarm is %.3f minutes",q1_wait_time)
+
+```
+
+# 8.c
+```{r question8_c}
+thirth_wait_time <- qexp(0.3, rate=0.5, lower.tail = TRUE)
+
+```
+
+
+```{r question8_c_output, echo=FALSE}
+sprintf("The 30th percentile of waiting time until the next alarm. is %.3f minutes",thirth_wait_time)
+```
+
+## Question 9
+```{r question9_given, echo=FALSE}
+cat("Two trials were done for getting client responses (150 size) where we got 55 response rate on first attempt and 30 % on followup")
+
+```
+
+```{r question9}
+#The probability of the first response is 0.55 and the probability of the second response depends upon the first response event.
+prob_first_event <- 0.55
+prob_second_event <- 0.45*0.3
+prob_110_1 <- pbinom(q=109,size=150,prob = prob_first_event+prob_second_event,lower.tail = FALSE) 
+
+```
+
+```{r question9_output, echo=FALSE}
+sprintf("The probability (fraction of successes) of getting this required number of returns from both waves is %.3f",prob_110_1)
+```
+
+## Question 10
+```{r question10_given, echo=FALSE}
+cat("Given:The charges of a credit card of an identical customer group has a mean of 350 and standard deviation of 100")
+
+```
+
+```{r question10_a}
+bad_debt_a <- 250
+total_charges_a <- 250/0.8 #provided 80% of total charges as  bad debt
+mean_charges <- 350
+sd_charges <- 100
+prob_def <- 0.07
+
+prob_morethan_250_a <- pnorm(q=total_charges_a,mean=mean_charges,sd=sd_charges,lower.tail=FALSE)
+
+prob_10_a <- prob_morethan_250_a * prob_def
+```
+
+```{r question10_a_output, echo=FALSE}
+sprintf("The probability that a typical customer in this group will default and produce a write-off of more than $250 in bad debt is %.3f",prob_10_a)
+```
+# 10.b
+```{r question10_b}
+customers_10 <- 500
+mean_number_250_def <- customers_10*prob_10_a
+sd_250_def <- sqrt(mean_number_250_def*(1-prob_10_a))
+```
+
+```{r question10_b_output, echo=FALSE}
+sprintf("The mean and sd of the 500 customers who had more than 250 bad debt and default is %.3f and %.3f",mean_number_250_def,sd_250_def)
+```
+
+
+# 10.c
+```{r question10_c}
+def_25_500 <- pbinom(24,500,prob_10_a,lower.tail = FALSE)
+```
+
+```{r question10_c_output, echo=FALSE}
+sprintf("The probability of 25 out of 500 customers who had more than 250 bad debt and default is %.3f",def_25_500)
+```
+## Question 11
+
+```{r question11_given, echo=FALSE}
+cat("Given: Sales forecaster of a Toy store predicted an demand of 20,000 units with a 0.95 probability that demand would be between 10,000 units and 30,000 units")
+
+```
+
+# 11.a
+```{r question11_a}
+z_11 <- qnorm(p=0.975,mean = 0,sd=1,lower.tail=TRUE) ## For 95% confidence z value
+## mean - z*sd = 10000, mean+z*sd = 30000 are the equations 
+equations <- rbind(c(1, -z_11), c(1,z_11))
+values <- c(10000,30000)
+mean_units <- solve(equations,values)[1]
+sd_units <- solve(equations,values)[2]
+```
+
+```{r question11_a_output, echo=FALSE}
+sprintf("The mean and standard deviation from the forecasters prediction are %f amd %.3f",mean_units,sd_units)
+```
+
+# 11.b
+```{r question11_b}
+stock_outs_quantity <- c(15000,18000,24000,28000)
+
+for(i in stock_outs_quantity){
+  assign(paste0("prob_",i),pnorm(q=i, mean=mean_units,sd=sd_units,lower.tail = FALSE))
+}
+```
+
+```{r question11_b_output, echo=FALSE}
+sprintf("The probability of stock-outs for order quantity 15,000; 18,000; 24,000; and 28,000 are %.3f; %.3f; %.3f; and %.3f",prob_15000,prob_18000,prob_24000,prob_28000)
+```
+
+# 11.c
+
+```{r question11c, echo=FALSE}
+cat("The projected profit for the order quantities 15,000; 18,000; 20,000; 24,000; and 28,000 under three scenarios: pessimistic in which sales 10,000 units, most likely case in which sales 20,000 units, and optimistic in which sales 30,000 units:")
+```
+
+
+```{r question11_c_output, echo=FALSE, out.width='100%'}
+knitr::include_graphics('analysis_image.png')
+```
+
+```{r question11c_prob, echo=FALSE}
+sprintf("The probability of having a demand of 10000, 20000 and 30000 are %.3f,%.3f and %.3f",pnorm(q=10000, mean=mean_units,sd=sd_units,lower.tail = FALSE),pnorm(q=20000, mean=mean_units,sd=sd_units,lower.tail = FALSE),pnorm(q=30000, mean=mean_units,sd=sd_units,lower.tail = FALSE))
+```
+
+```{r question11c_recommendation, echo=FALSE}
+cat("If the management wants ensure there is some profitibaility (pessimistic) then ordering 15000 quantity is the best way to go.\nWhen the management wants to have 50% chances its good to order 20000 units.\nIf the management is aggressive about the profits/sales then 30000 order is the best way to go.\nNote:The chances of having 30000 demand is pretty low, so comparing the probabilities I would recommend avoid ordering more than 24000 units\n***Recommendation: The optimal order quanity is 20000 units***")
+```
+# 11.d
+```{r question_11d_order}
+req_order_11d <- round(qnorm(p=0.7, mean=mean_units,sd=sd_units,lower.tail = TRUE))
+```
+
+```{r question_11d_output1, echo=FALSE}
+sprintf("When we want to meet 70 percent or more demand, the required number of units is %.f",req_order_11d)
+```
+
+```{r question_11d_profit}
+costs_11d <- req_order_11d*16
+demand_11d <- c(10000,20000,30000)
+profit_10000 <- ((demand_11d[1]*24) + ((req_order_11d-demand_11d[1])*5))-(costs_11d)
+profit_20000 <- ((demand_11d[2]*24) + ((req_order_11d-demand_11d[2])*5))-(costs_11d)
+profit_30000 <- (req_order_11d*24) - costs_11d
+```
+
+```{r question_11d_profit_output,echo=FALSE}
+sprintf("The profit in all three scenarios with %.f unit orders are %.f dollars, %.f dollars and %.f dollars",req_order_11d,profit_10000,profit_20000,profit_30000)
+
+```
+

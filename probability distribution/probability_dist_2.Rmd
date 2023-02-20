@@ -1,0 +1,1192 @@
+---
+title: "BAX-400 Homework 3"
+subtitle: "Summer 2022 Section 2"
+author:
+- Vamsee Krishna Reddy Narahari
+output: html_document
+date: '2022-08-26'
+---
+
+```{r setup, include=FALSE}
+options(warn=-1) ##Ignoring the warnings
+knitr::opts_chunk$set(echo = TRUE)
+#load required libraries
+list.of.packages <- c("ggplot2", "readr","dplyr","psych","data.table","knitr","kableExtra","tidyverse","lubridate","gmodels","gridExtra","reshape2","pivottabler","EnvStats","pwr")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
+
+library("readr")
+library("dplyr")
+library("psych")
+library("ggplot2")
+library("data.table")
+library("knitr")
+library("kableExtra")
+library("tidyverse")
+library("lubridate")
+library("gmodels")
+library("gridExtra")
+library("reshape2")
+library("pivottabler")
+library("pwr")
+library("EnvStats")
+```
+
+## Question-1 
+```{r question_1_provided, echo=FALSE}
+cat("Given: A battery manufacturing company expects it's batteries to last for atleast 400 hours and wanted to conduct hypothesis testing to validate the claim\nTo Do: Identify the sample size for conducting hypothesis testing")
+```
+
+```{r question_1}
+sign_lev_1 <- 0.02 #provided significance value
+power_value_1 <- (100-10)/100 #Power of the hypothesis testing
+std_value_1 <- 30 #population standard deviation
+diff_means <- 400-385 #Delta
+
+min_bat_sample_size <- power.t.test(n = NULL, delta = diff_means, sig.level = sign_lev_1, power = power_value_1,
+             type = "one.sample",
+             sd = std_value_1,
+             alternative = "one.sided")
+
+##Verification
+verf_power <- pt(qt(sign_lev_1, round(min_bat_sample_size$n)-1), round(min_bat_sample_size$n)-1, sqrt(round(min_bat_sample_size$n))*(-diff_means)/std_value_1, lower.tail = TRUE)
+```
+
+```{r question1_result,echo=FALSE}
+sprintf("The minimum sample size required for conducting the hypothesis testing for checking the battery life atleast for 400 hours with 90%% power is %.f",ceiling(min_bat_sample_size$n))
+```
+
+```{r question1_result_infr,echo=FALSE}
+## Verification
+sprintf("Verification: From first principles - The power of the testing when %.f sample size is %.2f ",ceiling(min_bat_sample_size$n),verf_power)
+```
+
+
+## Question-2 
+
+```{r question_2_given, echo=FALSE}
+cat("Given: Customers are waiting in line for teller windows at two different banks in two different formats\n  1. At first bank, people are in single line for all three teller windows\n  2. At second bank, people are in three different lines for three teller windows\nTo do: Compare the confidence intervals for the both the line systems")
+
+```
+```{r question_2_load_dataset}
+WaitingTimes <- read.csv("WaitingTimes.csv") ##Load the dataset
+head(WaitingTimes,1)
+```
+
+```{r question_2_data_summary}
+dt_boxplot <- melt(WaitingTimes, measure.vars=c('BankA', 'BankB'))
+
+ggplot(dt_boxplot, aes(x=variable,y=value)) + geom_boxplot(outlier.colour="red") + labs(title="Waiting times at banks",x="Banks",y="Waiting times")  ##Boxplots of the waiting times
+```
+
+```{r question_2_boxplot_interpretation, echo=FALSE}
+cat("From the boxplots: The waiting times at Bank B seems to have much variation than the BankA")
+```
+```{r question_2_confidenceintervals}
+std_dev_conf_int <- function(p_value,sample_size,sample_sd){
+  lchi_sq <- qchisq(p_value, df = sample_size - 1, lower.tail = TRUE) ## Calculate chi square values for the confidence interval
+  uchi_sq <- qchisq(p_value, df = sample_size - 1, lower.tail = FALSE)
+                                
+  sd_left_conf <- round(sqrt((sample_size - 1)*(sample_sd^2)/uchi_sq),3) ## Calculate Intervals
+  sd_right_conf <- round(sqrt((sample_size - 1)*(sample_sd^2)/lchi_sq),3)
+  
+  sd_interval <- c(sd_left_conf,sd_right_conf)
+  return(sd_interval)
+} ## Function for calculating the standard deviation intervals
+
+banka_sd_interval <- std_dev_conf_int(p_value = 0.025, sample_size = length(WaitingTimes$BankA), sample_sd = sd(WaitingTimes$BankA))
+bankb_sd_interval <- std_dev_conf_int(p_value = 0.025, sample_size = length(WaitingTimes$BankB), sample_sd = sd(WaitingTimes$BankB))
+```
+
+```{r question_2_banka_confidence_interval,echo=FALSE}
+sprintf("The 95%% confidence interval of Standard Deviation at the Bank A waiting times is %.3f-%.3f",banka_sd_interval[1],banka_sd_interval[2])
+```
+
+```{r question_2_bankb_confidence_interval,echo=FALSE}
+sprintf("The 95%% confidence interval of Standard Deviation at the Bank B waiting times is %.3f-%.3f",bankb_sd_interval[1],bankb_sd_interval[2])
+```
+
+```{r question_2_bankb_mean_intervals,echo=FALSE}
+sprintf("The mean waiting times for Bank A and B are %.3f and %.3f",mean(WaitingTimes$BankA),mean(WaitingTimes$BankB))
+```
+
+```{r question_2_bank_interpretation, echo=FALSE}
+cat("Interpretation: With 95% confidence, the intervals 0.32 and 0.87, 1.25 and 3.32 contains the population standard-deviation of waiting times at Bank A and Bank B.\n\nAnalysis: (Single Line System is better) Since the mean waiting times of both the banks are equal, standard deviation confidence intervals and its width of Bank B waiting times are much larger showcasing the irregularities i.e. uncertainity in the waiting time. So, with the provided sample of waiting times and analysis we can conclude that Single Line System is better. We can get further insights on this by doing Independent Two Sample Hypothesis Testing")
+```
+## Question 3
+```{r question_3_given, echo=FALSE}
+cat("Given: We need to identify the population proportion of US adults who think the president can influence the gasoline prices\nTo do: Determining the minimum sample size required to prove the claim")
+```
+# 3.a
+```{r question_3_a_assumption, echo=FALSE}
+cat("Assumption: As the estimated proportion is not given, we are assuming that value as 0.5")
+```
+
+```{r question_3_a}
+est_prop <- 0.5 #assumed proportion
+error_marg <- 0.04 #margin of error
+
+z95 <- qnorm(0.975, mean = 0, sd = 1, lower.tail = TRUE)
+
+min_us_pop <- ceiling(est_prop * (1-est_prop) * (z95/error_marg)^2)
+```
+
+```{r question_3a_result, echo=FALSE}
+sprintf("The minimum sample size needed for determining the population proportion of US adults who think that the president can do a lot about the price of gasoline %.f",min_us_pop)
+```
+# 3.b
+```{r question_3b}
+est_prop_3b <- 0.35 ##provided estimated proportion
+
+min_us_pop_3b <- ceiling(est_prop_3b * (1-est_prop_3b) * (z95/error_marg)^2)
+```
+
+```{r question_3b_result, echo=FALSE}
+sprintf("The minimum sample size needed for determining the population proportion of US adults who think that the president can do a lot about the price of gasoline with estimated proportion of 0.35 is %.f",min_us_pop_3b)
+
+```
+
+# 3.c
+```{r question_3c_analysis, echo=FALSE}
+cat("When the estimated proportion is higher then the required sample size is also higher. As we need to find estimated proportion of 0.5 in the provided sample we require higher number of samples than the proportion for 0.35")
+
+```
+## Question 4
+```{r question_4_given, echo=FALSE}
+cat("Given: Williamson university wants to analyze or understand why the admitted students are enrolling with their rival\nTo do: Analyze the demographics of the acceptable applicants to determine the population of the students.")
+
+```
+```{r question_4_load_dataset}
+willi_acc_app <- read.csv("Admissions.csv") ##Load the dataset
+head(willi_acc_app,1)
+```
+
+# 4.a
+```{r question_4a_part1_1}
+accepted_stud <- nrow(willi_acc_app) ##total students
+enrolled_stud <- nrow(filter(willi_acc_app,	Accepted.our.offer=='Yes')) ##accepted offer students
+enrolled_stud_prop <- enrolled_stud/accepted_stud
+
+
+ifelse(((accepted_stud*enrolled_stud_prop)>5) & (((accepted_stud)*(1-enrolled_stud_prop)) >5),"The samples are large enough to use a normal sampling distribution","The samples are not large enough to use a normal sampling distribution")
+```
+
+```{r question_4a_part1_2}
+z95 <- qnorm(0.975, mean = 0, sd = 1, lower.tail = TRUE)
+
+enrol_prop_left_4a <- round(enrolled_stud_prop - (z95 * sqrt(enrolled_stud_prop * (1 - enrolled_stud_prop)/accepted_stud)),3)
+enrol_prop_right_4a <- round(enrolled_stud_prop + (z95 * sqrt(enrolled_stud_prop * (1 - enrolled_stud_prop)/accepted_stud)),3)
+```
+
+
+```{r question_4a_part1_1_result,echo=FALSE}
+sprintf("We are 95%% confidence that the interval (%.3f, %.3f) contains the true population proportion of applicants who accepted williamson's offer", enrol_prop_left_4a, enrol_prop_right_4a)
+```
+
+```{r question_4a_part2_1}
+## Calculation of proportions for different combined scores intervals
+## Combined score less than 330
+accepted_stud_less_330 <- nrow(filter(willi_acc_app,Combined.Score < 330))
+enrolled_stud_less_330 <- nrow(filter(willi_acc_app,(Accepted.our.offer=='Yes') & (Combined.Score < 330)))
+enrolled_stud_prop_less_330 <- enrolled_stud_less_330/accepted_stud_less_330
+ifelse(((accepted_stud_less_330*enrolled_stud_prop_less_330)>5) & (((accepted_stud_less_330)*(1-enrolled_stud_prop_less_330)) >5),"The samples are large enough to use a normal sampling distribution","The samples are not large enough to use a normal sampling distribution")
+
+## Combined score between 330 and 375
+accepted_stud_330_375 <- nrow(filter(willi_acc_app,(Combined.Score >= 330) & (Combined.Score <= 375)))
+enrolled_stud_330_375  <- nrow(filter(willi_acc_app,(Accepted.our.offer=='Yes') & ((Combined.Score >= 330) & (Combined.Score <= 375))))
+enrolled_stud_prop_330_375  <- enrolled_stud_330_375 /accepted_stud_330_375 
+ifelse(((accepted_stud_330_375*enrolled_stud_prop_330_375)>5) & (((accepted_stud_330_375)*(1-enrolled_stud_prop_330_375)) >5),"The samples are large enough to use a normal sampling distribution","The samples are not large enough to use a normal sampling distribution")
+
+## Combined score greater than 375
+accepted_stud_375<- nrow(filter(willi_acc_app,Combined.Score > 375))
+enrolled_stud_375 <- nrow(filter(willi_acc_app,(Accepted.our.offer=='Yes') & (Combined.Score > 375)))
+enrolled_stud_prop_375 <- enrolled_stud_375/accepted_stud_375
+ifelse(((accepted_stud_375*enrolled_stud_prop_375)>5) & (((accepted_stud_375)*(1-enrolled_stud_prop_375)) >5),"The samples are large enough to use a normal sampling distribution","The samples are not large enough to use a normal sampling distribution")
+```
+
+```{r question_4a_part2}
+## Calculation of proportion intervals for different combined scores intervals
+## Combined score less than 330
+enrol_prop_left_4a_330 <- round(enrolled_stud_prop_less_330 - (z95 * sqrt(enrolled_stud_prop_less_330 * (1 - enrolled_stud_prop_less_330)/accepted_stud_less_330)),3)
+enrol_prop_right_4a_330 <- round(enrolled_stud_prop_less_330 + (z95 * sqrt(enrolled_stud_prop_less_330 * (1 - enrolled_stud_prop_less_330)/accepted_stud_less_330)),3)
+
+## Combined score between 330 and 375
+enrol_prop_left_4a_330_375 <- round(enrolled_stud_prop_330_375 - (z95 * sqrt(enrolled_stud_prop_330_375 * (1 - enrolled_stud_prop_330_375)/accepted_stud_330_375)),3)
+enrol_prop_right_4a_330_375 <- round(enrolled_stud_prop_330_375 + (z95 * sqrt(enrolled_stud_prop_330_375 * (1 - enrolled_stud_prop_330_375)/accepted_stud_330_375)),3)
+
+## Combined score greater than 375
+enrol_prop_left_4a_375 <- round(enrolled_stud_prop_375 - (z95 * sqrt(enrolled_stud_prop_375 * (1 - enrolled_stud_prop_375)/accepted_stud_375)),3)
+enrol_prop_right_4a_375 <- round(enrolled_stud_prop_375 + (z95 * sqrt(enrolled_stud_prop_375 * (1 - enrolled_stud_prop_375)/accepted_stud_375)),3)
+```
+
+```{r question_4a_part2_result}
+##Populating the results in a dataframe for visulation
+acceptable_prop_results <- data.frame(c("All data","Combined score < 330","Combined score between 330 and 375","Combined score > 375"),c(paste(enrol_prop_left_4a,"-",enrol_prop_right_4a),
+paste(enrol_prop_left_4a_330,"-",enrol_prop_right_4a_330),
+paste(enrol_prop_left_4a_330_375,"-",enrol_prop_right_4a_330_375),
+paste(enrol_prop_left_4a_375,"-",enrol_prop_right_4a_375)))
+
+colnames(acceptable_prop_results) <- c("Condition","Proportion Confidence Interval")
+
+acceptable_prop_results %>% kbl(caption = "Proportion confidence intervals for the entire data and respective combined score filters") %>%
+  kable_styling("striped", full_width = T)
+```
+
+```{r question_4a_part2_result_intr,echo=FALSE}
+cat("Interpretation: With 95% confidence the above intervals would capture the true proportion of the enrolled applicants at each condition mentioned")
+```
+
+
+# 4.b
+```{r question_4b_part1_1}
+median_combined_score <- median(willi_acc_app$Combined.Score) ##Median Combined Score
+accepted_stud_less_median <- nrow(filter(willi_acc_app,Combined.Score < median_combined_score)) 
+enrolled_stud_less_median <- nrow(filter(willi_acc_app,(Went.to.main.rival=='Yes') & (Combined.Score < median_combined_score)))
+enrolled_stud_prop_less_median <- enrolled_stud_less_median/accepted_stud_less_median
+
+ifelse(((accepted_stud_less_median*enrolled_stud_prop_less_median)>5) & (((accepted_stud_less_median)*(1-enrolled_stud_prop_less_median)) >5),"The samples are large enough to use a normal sampling distribution","The samples are not large enough to use a normal sampling distribution")
+```
+```{r question_4b_part1_1_assumption,echo=FALSE}
+cat("As the samples are not large enough, trying the Plus four estimators to check if it helps")
+```
+
+
+```{r question_4b_part1_2}
+## Plus four estimators 
+accepted_stud_less_median_plus4 <- nrow(filter(willi_acc_app,Combined.Score < median_combined_score)) + 4 #Add 4 to the total samples
+enrolled_stud_less_median_plus4  <- nrow(filter(willi_acc_app,(Went.to.main.rival=='Yes') & (Combined.Score < median_combined_score))) + 2 #Add 2 to the successes
+enrolled_stud_prop_less_median_plus4 <- enrolled_stud_less_median_plus4 /accepted_stud_less_median_plus4 
+
+z95 <- qnorm(0.975, mean = 0, sd = 1, lower.tail = TRUE)
+
+enrol_prop_left_gm_plus4 <- round(enrolled_stud_prop_less_median_plus4 - (z95 * sqrt(enrolled_stud_prop_less_median_plus4 * (1 - enrolled_stud_prop_less_median_plus4)/accepted_stud_less_median_plus4)),3)
+enrol_prop_right_gm_plus4 <- round(enrolled_stud_prop_less_median_plus4 + (z95 * sqrt(enrolled_stud_prop_less_median_plus4 * (1 - enrolled_stud_prop_less_median_plus4)/accepted_stud_less_median_plus4)),3)
+```
+```{r question_4a_part1_2_result_1000,echo=FALSE}
+sprintf("We are 95%% confidence that the interval (%.3f, %.3f) contains the true population proportion of applicants who accepted williamson's rival and less than median score", enrol_prop_left_gm_plus4, enrol_prop_right_gm_plus4)
+```
+
+
+
+```{r question_4b_part2_1}
+accepted_stud_greater_median <- nrow(filter(willi_acc_app,Combined.Score >= median_combined_score))
+enrolled_stud_greater_median <- nrow(filter(willi_acc_app,(Went.to.main.rival=='Yes') & (Combined.Score >= median_combined_score)))
+enrolled_stud_prop_greater_median <- enrolled_stud_greater_median/accepted_stud_greater_median
+
+
+ifelse(((accepted_stud_greater_median*enrolled_stud_prop_greater_median)>5) & (((accepted_stud_greater_median)*(1-enrolled_stud_prop_greater_median)) >5),"The samples are large enough to use a normal sampling distribution","The samples are not large enough to use a normal sampling distribution")
+```
+
+```{r question_4b_part2_2}
+z95 <- qnorm(0.975, mean = 0, sd = 1, lower.tail = TRUE)
+
+enrol_prop_left_gm <- round(enrolled_stud_prop_greater_median - (z95 * sqrt(enrolled_stud_prop_greater_median * (1 - enrolled_stud_prop_greater_median)/accepted_stud_greater_median)),3)
+enrol_prop_right_gm <- round(enrolled_stud_prop_greater_median + (z95 * sqrt(enrolled_stud_prop_greater_median * (1 - enrolled_stud_prop_greater_median)/accepted_stud_greater_median)),3)
+```
+
+```{r question_4a_part1_2_result_1,echo=FALSE}
+sprintf("We are 95%% confidence that the interval (%.3f, %.3f) contains the true population proportion of applicants who accepted williamson's rival and greater than median score", enrol_prop_left_gm, enrol_prop_right_gm)
+```
+
+# 4.c 
+```{r question_4_function}
+mean_conf_intervals <- function(data_col){
+  sample_mean <- mean(data_col)
+  sample_size <- length(data_col)
+  sample_sd <- sd(data_col)
+  
+  t95 <- qt(0.975, df = sample_size - 1, lower.tail = TRUE)
+
+  left_interval_95 <- round(sample_mean - (t95*sample_sd/sqrt(sample_size)),3)
+  right_interval_95 <- round(sample_mean + (t95*sample_sd/sqrt(sample_size)),3)
+  
+  return(c(left_interval_95,right_interval_95))
+} ## Function to calculate the mean confidence intervals
+
+enroll_gpa <- mean_conf_intervals(filter(willi_acc_app,Accepted.our.offer=='Yes')$HS.GPA) ##GPA enrolled confidence interval
+enroll_sat <- mean_conf_intervals(filter(willi_acc_app,Accepted.our.offer=='Yes')$SAT) ##SAT enrolled confidence interval
+enroll_cs <- mean_conf_intervals(filter(willi_acc_app,Accepted.our.offer=='Yes')$Combined.Score)##Combined enrolled score confidence interval
+
+declined_gpa <- mean_conf_intervals(filter(willi_acc_app,Accepted.our.offer=='No')$HS.GPA)##GPA declined confidence interval
+declined_sat <- mean_conf_intervals(filter(willi_acc_app,Accepted.our.offer=='No')$SAT)##SAT declined confidence interval
+declined_cs <- mean_conf_intervals(filter(willi_acc_app,Accepted.our.offer=='No')$Combined.Score)##Combined declined score confidence interval
+
+mean_diff_conf_intervals <- function(data_col1,data_col2){
+  t_test_result <- t.test(data_col1, 
+            data_col2, 
+            var.equal = TRUE, 
+            paired = FALSE, 
+            conf.level = 0.95)
+
+  left_int_95 <- t_test_result$conf.int[1]
+  right_int_95 <- t_test_result$conf.int[2]
+  
+  return(c(left_int_95,right_int_95))
+} ## Function to calculate the mean difference intervals (Two Sample Confidence Intervals)
+
+gpa_diff <- mean_diff_conf_intervals(filter(willi_acc_app,Accepted.our.offer=='Yes')$HS.GPA,filter(willi_acc_app,Accepted.our.offer=='No')$HS.GPA)
+sat_diff <- mean_diff_conf_intervals(filter(willi_acc_app,Accepted.our.offer=='Yes')$SAT,filter(willi_acc_app,Accepted.our.offer=='No')$SAT)
+cs_diff <- mean_diff_conf_intervals(filter(willi_acc_app,Accepted.our.offer=='Yes')$Combined.Score,filter(willi_acc_app,Accepted.our.offer=='No')$Combined.Score)
+```
+
+
+```{r question_4c_function_results}
+accepted_enroll_means <- data.frame(rbind(paste(enroll_cs[1],"-",enroll_cs[2]),paste(enroll_gpa[1],"-",enroll_gpa[2]),paste(enroll_sat[1],"-",enroll_sat[2])))
+colnames(accepted_enroll_means) <- c('Mean Confidence Interval')
+rownames(accepted_enroll_means) <- c('Combined Score','GPA','SAT')
+
+
+
+declined_enroll_means <- data.frame(rbind(paste(declined_cs[1],"-",declined_cs[2]),paste(declined_gpa[1],"-",declined_gpa[2]),paste(declined_sat[1],"-",declined_sat[2])))
+colnames(declined_enroll_means) <- c('Mean Confidence Interval')
+rownames(declined_enroll_means) <- c('Combined Score','GPA','SAT')
+
+
+
+diff_enroll_means <- data.frame(rbind(paste(cs_diff[1],"-",cs_diff[2]),paste(gpa_diff[1],"-",gpa_diff[2]),paste(sat_diff[1],"-",sat_diff[2])))
+colnames(diff_enroll_means) <- c('Mean Confidence Interval')
+rownames(diff_enroll_means) <- c('Combined Score','GPA','SAT')
+
+```
+
+```{r question_4c_function_results_print,echo=FALSE, fig.show="hold", out.width="33%"}
+kable(accepted_enroll_means,caption = '**Mean Confidence Intervals of Enrolled Student**') %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed","responsive"))
+
+kable(declined_enroll_means,caption = '**Mean Confidence Intervals of Offer Declined Students**') %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed","responsive"))
+
+kable(diff_enroll_means,caption = '**Mean Difference Confidence Intervals for accepted and declined**') %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed","responsive"))
+```
+
+```{r question_4c_results_inter,echo=FALSE}
+cat("Interpretation: With 95% confidence the above intervals would capture the true mean of the all applicants, enrolled applicants and difference  between the both the applicants for GPA, SAT and Combined Scores")
+```
+
+
+# 4.d
+```{r question_4d_part1_1}
+accepted_stud_greater_2off <- nrow(filter(willi_acc_app,(HS.Clubs>=2)))
+enrolled_stud_greater_2off <- nrow(filter(willi_acc_app,	(Accepted.our.offer=='Yes') & (HS.Clubs>=2)))
+enrolled_stud_prop_2off <- enrolled_stud_greater_2off/accepted_stud_greater_2off
+
+
+ifelse(((accepted_stud_greater_2off*enrolled_stud_prop_2off)>5) & (((accepted_stud_greater_2off)*(1-enrolled_stud_prop_2off)) >5),"The samples are large enough to use a normal sampling distribution","The samples are not large enough to use a normal sampling distribution")
+```
+
+```{r question_4d_part1_2}
+enrol_prop_left_4d_2off <- round(enrolled_stud_prop_2off - (z95 * sqrt(enrolled_stud_prop_2off * (1 - enrolled_stud_prop_2off)/accepted_stud_greater_2off)),3)
+enrol_prop_right_4d_2off <- round(enrolled_stud_prop_2off + (z95 * sqrt(enrolled_stud_prop_2off * (1 - enrolled_stud_prop_2off)/accepted_stud_greater_2off)),3)
+```
+
+```{r question_4d_part1_2_results,echo=FALSE}
+sprintf("With 95%% confidence the interval (%.3f, %.3f) capture the true proportion of students who are officers atleast 2 clubs and accepted the offer", enrol_prop_left_4d_2off, enrol_prop_right_4d_2off)
+```
+
+```{r question_4d_part2_1}
+accepted_stud_greater_4var <- nrow(filter(willi_acc_app,(HS.Sports>=4)))
+enrolled_stud_greater_4var <- nrow(filter(willi_acc_app,	(Accepted.our.offer=='Yes') & (HS.Sports>=4)))
+enrolled_stud_prop_4var <- enrolled_stud_greater_4var/accepted_stud_greater_4var
+
+ifelse(((accepted_stud_greater_4var*enrolled_stud_prop_4var)>5) & (((accepted_stud_greater_4var)*(1-enrolled_stud_prop_4var)) >5),"The samples are large enough to use a normal sampling distribution","The samples are not large enough to use a normal sampling distribution")
+```
+
+```{r question_4d_part2_2}
+enrol_prop_left_4d_4off <- round(enrolled_stud_prop_4var - (z95 * sqrt(enrolled_stud_prop_4var * (1 - enrolled_stud_prop_4var)/accepted_stud_greater_4var)),3)
+enrol_prop_right_4d_4off <- round(enrolled_stud_prop_4var + (z95 * sqrt(enrolled_stud_prop_4var * (1 - enrolled_stud_prop_4var)/accepted_stud_greater_4var)),3)
+```
+
+```{r question_4d_part2_results, echo=FALSE}
+sprintf("With 95%% confidence, the interval (%.3f, %.3f) capture the true proportion of students  for students who are officers atleast 4 four varsity letters and accepted the offer", enrol_prop_left_4d_4off, enrol_prop_right_4d_4off)
+
+```
+
+# 4.e
+```{r question_4e_initial_understanding,echo=FALSE}
+cat("To determine if the Williamson was able to attract the students from large schools we can find out the proportion of students accepted the offer from less than the median size, greater than the median and difference between those proportions")
+```
+
+
+```{r question_4e_median}
+willi_median <- median(willi_acc_app$HS.Size)
+
+## Less than the Median High School Size Proportion Confidence Intervals 
+accepted_stud_less_comb_median <- nrow(filter(willi_acc_app,HS.Size<=willi_median))
+enrolled_stud_less_comb_median <- nrow(filter(willi_acc_app,	Accepted.our.offer=='Yes' & HS.Size<=willi_median))
+enrolled_stud_prop_less_comb_median <- enrolled_stud_less_comb_median/accepted_stud_less_comb_median
+
+
+ifelse(((accepted_stud_less_comb_median*enrolled_stud_prop_less_comb_median)>5) & (((accepted_stud_less_comb_median)*(1-enrolled_stud_prop_less_comb_median)) >5),"The provided is large enough to conduct the confidence intervals","The provided is not large enough to conduct the analysis")
+```
+
+```{r question_4e_median_1}
+z95 <- qnorm(0.975, mean = 0, sd = 1, lower.tail = TRUE)
+
+enrol_prop_left_4e_less_median <- round(enrolled_stud_prop_less_comb_median - (z95 * sqrt(enrolled_stud_prop_less_comb_median * (1 - enrolled_stud_prop_less_comb_median)/accepted_stud_less_comb_median)),3)
+enrol_prop_right_4e_less_median <- round(enrolled_stud_prop_less_comb_median + (z95 * sqrt(enrolled_stud_prop_less_comb_median * (1 - enrolled_stud_prop_less_comb_median)/accepted_stud_less_comb_median)),3)
+```
+
+```{r question_4e_median_2}
+## Greater than the Median High School Size Proportion Confidence Intervals
+
+accepted_stud_greater_comb_median <- nrow(filter(willi_acc_app,HS.Size>willi_median))
+enrolled_stud_greater_comb_median <- nrow(filter(willi_acc_app,	Accepted.our.offer=='Yes' & HS.Size>willi_median))
+enrolled_stud_prop_greater_comb_median <- enrolled_stud_greater_comb_median/accepted_stud_greater_comb_median
+
+
+ifelse(((accepted_stud_greater_comb_median*enrolled_stud_prop_greater_comb_median)>5) & (((accepted_stud_greater_comb_median)*(1-enrolled_stud_prop_greater_comb_median)) >5),"The samples are large enough to use a normal sampling distribution","The samples are not large enough to use a normal sampling distribution")
+```
+
+```{r question_4e_median_4}
+## Greater than the Median High School Size Proportion Confidence Intervals
+z95 <- qnorm(0.975, mean = 0, sd = 1, lower.tail = TRUE)
+
+enrol_prop_left_4e_greater_median <- round(enrolled_stud_prop_greater_comb_median - (z95 * sqrt(enrolled_stud_prop_greater_comb_median * (1 - enrolled_stud_prop_greater_comb_median)/accepted_stud_greater_comb_median)),3)
+enrol_prop_right_4e_greater_median <- round(enrolled_stud_prop_greater_comb_median + (z95 * sqrt(enrolled_stud_prop_greater_comb_median * (1 - enrolled_stud_prop_greater_comb_median)/accepted_stud_greater_comb_median)),3)
+```
+
+```{r question_4e_median_diff}
+enroll_prop_diff <- prop.test(c(enrolled_stud_less_comb_median,enrolled_stud_greater_comb_median), 
+          c(accepted_stud_less_comb_median,accepted_stud_greater_comb_median), alternative = "two.sided", 
+          conf.level = 0.95, correct = FALSE)
+
+enroll_prop_diff$conf.int
+```
+
+
+
+```{r question_4e_median_printout,echo=FALSE}
+median_results_dataframe <- data.frame(c("School size greater than median","School size less than median","Difference Between Median") ,c(paste(enrol_prop_left_4e_greater_median,"-",enrol_prop_right_4e_greater_median),
+paste(enrol_prop_left_4e_less_median,"-",enrol_prop_right_4e_less_median),
+paste(0.082,"-",0.364)))
+colnames(median_results_dataframe) <- c("Condition","Proportion Confidence Interval")
+
+median_results_dataframe %>% kbl(caption = "Proportion Confidence Intervals") %>%
+  kable_styling("striped", full_width = T)
+
+```
+```{r question_4e_median_printout_int,echo=FALSE}
+cat("With 95% confidence the above intervals would capture the true proportions of the student enrollement with different conditions as mentioned above")
+```
+```{r question_4e_part2_reasoning,echo=FALSE}
+cat("Although the High School Size based proportion intervals would provide if Williamson was able to attract the Large School Students we are not still able to answer the question if we are able to attract the if we are getting highly ranked students from Large High Schools\n\nSo we created a set of rules for dividing the datasets into certain groupings based upon their percentiles and high school for determining the proportion confidence intervals for who accepted the offer")
+```
+
+
+
+```{r question_4e_fivenum}
+
+will_perc_fivenum <- fivenum(willi_acc_app$HS.Percentile)
+will_size_fivenum <- fivenum(willi_acc_app$HS.Size)
+
+#Create Groupings
+willi_acc_app <- willi_acc_app %>% 
+  mutate(perc_groups=if_else(HS.Percentile >= will_perc_fivenum[1] & HS.Percentile < will_perc_fivenum[2],paste(will_perc_fivenum[1],will_perc_fivenum[2],sep = "-"),if_else(HS.Percentile >= will_perc_fivenum[2] & HS.Percentile < will_perc_fivenum[3],paste(will_perc_fivenum[2],will_perc_fivenum[3],sep = "-"),if_else(HS.Percentile >= will_perc_fivenum[3] & HS.Percentile < will_perc_fivenum[4],paste(will_perc_fivenum[3],will_perc_fivenum[4],sep = "-"),if_else(HS.Percentile >= will_perc_fivenum[4] & HS.Percentile <= will_perc_fivenum[5],paste(will_perc_fivenum[4],will_perc_fivenum[5],sep="-"),"NA")))))
+
+willi_acc_app <- willi_acc_app %>% 
+  mutate(size_groups=if_else(HS.Size >= will_size_fivenum[1] & HS.Size < will_size_fivenum[2],paste(will_size_fivenum[1],will_size_fivenum[2],sep = "-"),if_else(HS.Size >= will_size_fivenum[2] & HS.Size < will_size_fivenum[3],paste(will_size_fivenum[2],will_size_fivenum[3],sep = "-"),if_else(HS.Size >= will_size_fivenum[3] & HS.Size < will_size_fivenum[4],paste(will_size_fivenum[3],will_size_fivenum[4],sep = "-"),if_else(HS.Size >= will_size_fivenum[4] & HS.Size <= will_size_fivenum[5],paste(will_size_fivenum[4],will_size_fivenum[5],sep = "-"),"NA")))))
+
+
+#group countings 
+willi_groups_all <- willi_acc_app %>% group_by(perc_groups,size_groups) %>% summarise(stud_count=n())
+
+willi_groups_enrol <- filter(willi_acc_app,willi_acc_app$Accepted.our.offer =="Yes") %>% group_by(perc_groups,size_groups) %>% summarise(stud_count=n())
+
+#join dataframes
+will_groups <- merge(x = willi_groups_all, y = willi_groups_enrol, by = c("perc_groups","size_groups"))
+
+will_groups$proportion <- will_groups$stud_count.y/will_groups$stud_count.x
+
+## Proportion
+prop_pt <- PivotTable$new()
+prop_pt$addData(will_groups)
+prop_pt$addColumnDataGroups("perc_groups",addTotal=FALSE)
+prop_pt$addRowDataGroups("size_groups",addTotal=FALSE)
+prop_pt$sortRowDataGroups(levelNumber=1, orderBy="customByValue", sortOrder="asc",customOrder=c("45-223","223-282","282-379","379-617"))
+prop_pt$defineCalculation(calculationName="proportions", summariseExpression="sum(proportion)", format=list(digits=3))
+prop_pt$evaluatePivot()
+prop_pt$renderPivot()
+```
+
+```{r question_4e_prop_pivot,echo=FALSE}
+cat("The above table provides the proportions for all the groupings done based upon the five number summary\nRows: High School Size\nColumns: Percentiles")
+```
+
+
+```{r question_4e_porp_conf_intervals}
+## Calculate the confidence intervals based on the 
+left_int_proportion <- c()
+right_int_proportion <- c()
+for(i in 1:nrow(will_groups)){
+  z95 <- qnorm(0.975, mean = 0, sd = 1, lower.tail = TRUE)
+  
+  left_int_proportion[i] <- round(will_groups$proportion[[i]] - (z95 * sqrt(will_groups$proportion[[i]] * (1 - will_groups$proportion[[i]])/will_groups$stud_count.x[[i]])),1
+                                  )
+  
+  right_int_proportion[i] <- round(will_groups$proportion[[i]] + (z95 * sqrt(will_groups$proportion[[i]] * (1 - will_groups$proportion[[i]])/will_groups$stud_count.x[[i]])),1)
+}
+
+will_groups$left_prop_int <- left_int_proportion
+will_groups$right_prop_int <- right_int_proportion
+will_groups$interval <- paste0("(",will_groups$left_prop_int,"-",will_groups$right_prop_int,")")
+```
+
+```{r question_4e_print}
+prop_pt_conf <- PivotTable$new()
+prop_pt_conf$addData(will_groups)
+prop_pt_conf$addColumnDataGroups("perc_groups",addTotal=FALSE)
+prop_pt_conf$addRowDataGroups("size_groups",addTotal=FALSE)
+prop_pt_conf$sortRowDataGroups(levelNumber=1, orderBy="customByValue", sortOrder="asc",customOrder=c("45-223","223-282","282-379","379-617"))
+prop_pt_conf$defineCalculation(calculationName="proportions", summariseExpression="(interval)", format=list(digits=1))
+prop_pt_conf$evaluatePivot()
+prop_pt_conf$renderPivot()
+```
+
+```{r question_4e_print_int_pivot,echo=FALSE}
+cat("With 95% confidence, the above intervals contains the true proportions of the enrolled students in those respective school size and percentile\nRows: High School Size\nColumns: Percentiles")
+```
+```{r question_4e_second_int_reasons,echo=FALSE}
+cat("Note: Some of the above confidence intervals are in negative and more than 1 due to not satisfying the sample normality condition but these can be improved by using Plus Four estimators or other methodologies")
+```
+```{r question_4_insights,echo=FALSE}
+cat("Analysis Summary:\n1. While the williamson's combined score (metric to evaluate the students) is increasing, the true proportion of the offer accepting students is decreasing suggesting the higher performing students are declining the offer\n2: The true proportion of the students who accepted Williamson's main rival with combined score higher than median combined score is relatively greater than the students with less than median combined score suggesting the Main Rival were enrolling the high performing students\n3: The true mean scores of the GPA, SAT and Combined scores of students who accepted the williamson's offer much less than the declined students\n4: Williamson was not able to gather the high performing students in extra-curricular activities as the accepted student proportions are much less than the offer rejected students\n5: With increasing the school size and high percentile the proportion of students who are accepting the offer is decreasing")
+```
+
+```{r question4_recommendation,echo=FALSE}
+cat("***From the estimated confidence intervals and mentioned insights, Williamson has a huge problem since high performance students across academics and extra-curricular activities are not accepting the offer. Williamson need to dig deeper on to twhy they are not able to attract the students, understand their requirements and might need to amend their programs and facilities.***")
+```
+
+
+## Question 5
+```{r question_5_provided, echo=FALSE}
+cat("Given: Youhao hypothesis that the new delivery partners are the reasons for the later delivery times and customer compliants\nTo do: Analyze the delivery times and get the confidence intervals")
+
+```
+
+```{r question_5_load_dataset}
+delivery_youhao <- read.csv("DeliveryTimes.csv")
+head(delivery_youhao,1)
+```
+
+# 5.a
+```{r question_5a_part1_analysis}
+mean_conf_intervals <- function(data_col){
+  sample_mean <- mean(data_col)
+  sample_size <- length(data_col)
+  sample_sd <- sd(data_col)
+  
+  t95 <- qt(0.975, df = sample_size - 1, lower.tail = TRUE)
+
+  left_interval_95 <- round(sample_mean - (t95*sample_sd/sqrt(sample_size)),3)
+  right_interval_95 <- round(sample_mean + (t95*sample_sd/sqrt(sample_size)),3)
+  
+  return(c(left_interval_95,right_interval_95))
+}
+
+delivery_person_1 <- mean_conf_intervals(filter(delivery_youhao,Deliverer==1)$Travel.Time)
+delivery_person_2 <- mean_conf_intervals(filter(delivery_youhao,Deliverer==2)$Travel.Time)
+delivery_person_3 <- mean_conf_intervals(filter(delivery_youhao,Deliverer==3)$Travel.Time)
+delivery_person_4 <- mean_conf_intervals(filter(delivery_youhao,Deliverer==4)$Travel.Time)
+
+delivery_youhao$total_time <- delivery_youhao$Prep.Time + delivery_youhao$Travel.Time
+
+delivery_person_1_total <- mean_conf_intervals(filter(delivery_youhao,Deliverer==1)$total_time)
+delivery_person_2_total <- mean_conf_intervals(filter(delivery_youhao,Deliverer==2)$total_time)
+delivery_person_3_total <- mean_conf_intervals(filter(delivery_youhao,Deliverer==3)$total_time)
+delivery_person_4_total <- mean_conf_intervals(filter(delivery_youhao,Deliverer==4)$total_time)
+
+travel_times_vector <- c(paste(delivery_person_1[1],"-",delivery_person_1[2]),paste(delivery_person_2[1],"-",delivery_person_2[2]),paste(delivery_person_3[1],"-",delivery_person_3[2]),paste(delivery_person_4[1],"-",delivery_person_4[2]))
+
+travel_delivery_mean_times <- data.frame(c(1,2,3,4),travel_times_vector,
+           c(paste(delivery_person_1_total[1],"-",delivery_person_1_total[2]),
+             paste(delivery_person_2_total[1],"-",delivery_person_2_total[2]),
+             paste(delivery_person_3_total[1],"-",delivery_person_3_total[2]),
+             paste(delivery_person_4_total[1],"-",delivery_person_4_total[2])))
+
+colnames(travel_delivery_mean_times) <- c("Delivery Person","Delivery Times Confidence Interval","Total Times Confidence Interval")
+
+travel_delivery_mean_times %>% kbl(caption = "Mean Time Confidence Intervals") %>%
+  kable_styling("striped", full_width = T)
+```
+
+```{r question_5a_part1_1_intr,echo=FALSE}
+cat("With 95% confidence, the above intervals would capture the true population mean delivery and total times of all the delivery persons")
+```
+```{r question_5a_part1_1_intr2,echo=FALSE}
+cat("The above intervals may not be best measures for the following reasons:\n1. The distance to be covered for each ordered might be different and some delivery persons might always take the longer distance to be covered which would eventually push their time for delivery higher\n2: There are other external factors which can influence the busier/high traffic routes can be taken by a certain delivery person etc.,")
+```
+
+
+```{r question_5a_part2_1}
+delivery_youhao$delivery_speed <- (delivery_youhao$Distance*60)/delivery_youhao$Travel.Time
+
+delivery_person_1_speed <- mean_conf_intervals(filter(delivery_youhao,Deliverer==1)$delivery_speed)
+delivery_person_2_speed <- mean_conf_intervals(filter(delivery_youhao,Deliverer==2)$delivery_speed)
+delivery_person_3_speed <- mean_conf_intervals(filter(delivery_youhao,Deliverer==3)$delivery_speed)
+delivery_person_4_speed <- mean_conf_intervals(filter(delivery_youhao,Deliverer==4)$delivery_speed)
+
+mean_speed_vector <- c(paste(delivery_person_1_speed[1],"-",delivery_person_1_speed[2]),paste(delivery_person_2_speed[1],"-",delivery_person_2_speed[2]),paste(delivery_person_3_speed[1],"-",delivery_person_3_speed[2]),paste(delivery_person_4_speed[1],"-",delivery_person_4_speed[2]))
+
+mean_speed_confidence_intervals <- data.frame(c(1,2,3,4),mean_speed_vector)
+
+colnames(mean_speed_confidence_intervals) <- c("Delivery Person","Speed Confidence Interval")
+
+mean_speed_confidence_intervals %>% kbl(caption = "Mean Time Confidence Intervals") %>%
+  kable_styling("striped", full_width = T)
+```
+
+```{r question_5a_part2_intr,echo=FALSE}
+cat("With 95% confidence, the above intervals would capture the true population speed of the deliveries for all the four delivery persons")
+```
+
+
+```{r question_5a_part2_2}
+
+mean_diff_conf_intervals <- function(data_col1,data_col2){
+  t_test_result <- t.test(data_col1, 
+            data_col2, 
+            var.equal = TRUE, 
+            paired = FALSE, 
+            conf.level = 0.95)
+
+  left_int_95 <- t_test_result$conf.int[1]
+  right_int_95 <- t_test_result$conf.int[2]
+  
+  return(c(round(left_int_95,3),round(right_int_95,3)))
+}
+  
+for(i in 1:4){
+  for(j in 1:3){
+  assign(paste0("delivery_person_speed_",i,j+1),mean_diff_conf_intervals(filter(delivery_youhao,Deliverer==i)$delivery_speed,filter(delivery_youhao,Deliverer==j+1)$delivery_speed))
+  }
+}
+
+speed_difference_confidence_intervals <- data.frame(rbind(paste(delivery_person_speed_12[1],"-",delivery_person_speed_12[2]),paste(delivery_person_speed_13[1],"-",delivery_person_speed_13[2]),paste(delivery_person_speed_14[1],"-",delivery_person_speed_14[2]),paste(delivery_person_speed_23[1],"-",delivery_person_speed_23[2]),paste(delivery_person_speed_24[1],"-",delivery_person_speed_24[2]),paste(delivery_person_speed_34[1],"-",delivery_person_speed_34[2])))
+
+
+colnames(speed_difference_confidence_intervals) <- c("Mean Speed Confidence Intervals")
+rownames(speed_difference_confidence_intervals) <- c("Speed Difference 1 & 2","Speed Difference 1 & 3","Speed Difference 1 & 4","Speed Difference 2 & 3","Speed Difference 2 & 4","Speed Difference 3 & 4")
+
+
+speed_difference_confidence_intervals %>% kbl(caption = "Mean Speed Confidence Intervals") %>%
+  kable_styling("striped", full_width = T)
+```
+
+
+# 5.b
+```{r}
+propotion_interval_function <- function(sample_size,prop_value){
+  ifelse(((sample_size*prop_value)>5) & (((sample_size)*(1-prop_value)) >5),"The provided is large enough to conduct the analysis","The provided is not large enough to conduct the analysis")
+  
+  z95 <- qnorm(0.975, mean = 0, sd = 1, lower.tail = TRUE)
+  prop_left_4a <- round(prop_value - (z95 * sqrt(prop_value * (1 - prop_value)/sample_size)),3)
+  prop_right_4a <- round(prop_value + (z95 * sqrt(prop_value * (1 - prop_value)/sample_size)),3)
+  
+  return(c(prop_left_4a,prop_right_4a))
+}
+
+sample_size_10mile_df <- filter(delivery_youhao,Distance<=10)
+sample_size_10mile <- nrow(sample_size_10mile_df)
+given_m_mins <- c(25,30,35)
+
+for(i in 1:3){
+  prop_value_time <- nrow(filter(sample_size_10mile_df,total_time<=given_m_mins[i]))/sample_size_10mile
+  assign(paste0("delivery_lessthan_m",given_m_mins[i]),propotion_interval_function(sample_size_10mile,prop_value_time))
+}
+
+
+delivery_less_than_m <- data.frame(c(delivery_lessthan_m25[1],delivery_lessthan_m30[1],delivery_lessthan_m35[1]),c(delivery_lessthan_m25[2],delivery_lessthan_m30[2],delivery_lessthan_m35[2]))
+
+colnames(delivery_less_than_m) <- c("Left_Confidence_Interval","Right_Confidence_Interval")
+rownames(delivery_less_than_m) <- c("Delivery Times <= 25 mins","Delivery Times <= 30 mins","Delivery Times <= 35 mins")
+```
+
+# 5.b_ii
+```{r question5b_results}
+delivery_less_than_m$minimum_pay_1000 <- (1-delivery_less_than_m$Right_Confidence_Interval)*1000*10
+delivery_less_than_m$maximum_pay_1000 <- (1-delivery_less_than_m$Left_Confidence_Interval)*1000*10
+
+delivery_less_than_m %>% kbl(caption = "Confidence Intervals and their costs") %>%
+  kable_styling("striped", full_width = T)
+```
+
+```{r question5b_inter_results,echo=FALSE}
+cat("With 95% confidence the above intervals would capture the true proportion of deliveries within the respective times and provides the cost ranges assosciated with it")
+```
+
+
+# 5.c
+
+```{r question_5c_initial}
+delivery_youhao$est_delivery_time <- round((14.8+ 2.06*delivery_youhao$Distance)) + 5
+
+sample_size_total_guaranteed <- nrow(delivery_youhao)
+
+prop_value_guaranteed <- nrow(filter(delivery_youhao,total_time<=est_delivery_time))/sample_size_total_guaranteed
+guranteed_prop_int <- propotion_interval_function(sample_size_total_guaranteed,prop_value_guaranteed)
+
+```
+```{r question_5c_initial_results,echo=FALSE} 
+sprintf("With 95%% confidence, the interval (%.3f,%.3f) would capture the True proportion of the deliveries which are delivered within less than the guaranteed delivery time",guranteed_prop_int[1],guranteed_prop_int[2])
+```
+
+
+```{r question_5c_extra_payments}
+guaranteed_extra_pay <- (1-guranteed_prop_int)*1000*10
+```
+
+```{r question_5c_extra_payments_results,echo=FALSE}
+sprintf("The range for the dollar amount of certicates it will have to pay for being late is (%.f,%.f)",guaranteed_extra_pay[2],guaranteed_extra_pay[1])
+```
+
+```{r question_5_insights,echo=FALSE}
+cat("Analysis Summary: 1. Although the true delivery times of 1&2 are relatively less than the 3&4, the delivery speeds telling a different story. So probably the delivery person 3&4 are travelling longer distances than the 1&2\n2: The guaranteed delivery time predictor saves the costs in late delivery certifications than the fixed time guarantees")
+```
+
+```{r question5_recommendations,echo=FALSE}
+cat("Recommendations: 1. To evaluate the delivery person performance, the best measure would be their delivery times\n2. Use the equation method for guaranting the customers with their delivery time")
+```
+
+
+## Question 6
+```{r question6_provided,echo=FALSE}
+cat("Given: Courier Company manager wants to test a new strategy for receiving faster payments to the invoices\nTo Do: Determining the required level of significance and conducting statstical test")
+
+```
+
+```{r question6_loaddataset}
+ssa_pay_times <- read.csv("SSA.csv")
+head(ssa_pay_times,1)
+```
+
+```{r question6_hypothesis_statement,echo=FALSE}
+cat("Null Hypothesis: The mean of payment times is greater than or equal to 22 days\nAlternate Hypothesis: The mean of payment times is less than 22 days")
+```
+
+**Hypothesis:**<br />
+<br>$H_{o}$ : $\mu$ $\geq$ 22<br />
+<br>$H_{1}$ : $\mu$ < 22
+
+```{r question6_define_type1_type2, echo=FALSE}
+cat("Type 1 error (Rejecting null hypothesis when we shouldn't: When we are rejecting the null hypothesis i.e. considering that the payments are done in less than 22 days, the company would implement the new strategy. This would end up with not having profits additionally impacting the financials as the payments can take longer than 22 days.\nType 2 error(Failed to reject the null hypothesis when we should): We might lose out on the profits opportunity through failed to reject the null hypothesis and not implementing the new strategy")
+```
+
+```{r question6_define_los, echo=FALSE}
+cat("As the implications of Type-1 error is more, its good to take the Level of signficance lower value. The would be 0.01")
+```
+$\alpha$ = 0.01
+
+```{r question6_hyppothesis_testing_what,echo=FALSE}
+cat("One sample Hypothesis Testing")
+```
+
+```{r question6_hypothesis_testing}
+ssa_new_str <- t.test(ssa_pay_times$Payment, alternative = "less", mu = 22, conf.level=0.99)
+ssa_new_str
+```
+
+```{r question6_inference,echo=FALSE}
+sprintf("As the p-value (%.3f) is greater than the significance (0.01), There is not sufficient evidence to support the claim that the new strategy would decrease the mean payment times to less than 22 days and we would be profitable.\n This opportunity missing can be further analyzed based on the cost-benefit analysis",ssa_new_str$p.value)
+```
+
+## Question 7
+```{r question7_provided,echo=FALSE}
+cat("Given: A TV channel conducted exit poll analysis to predict the winner of Florida state elections\nTo do: Conduct the statstical significant analysis on the provided sample")
+```
+
+```{r question7_loaddataset}
+elections_result <- read.csv("Elections.csv")
+head(elections_result,1)
+```
+```{r question7_hypothesis_statements,echo=FALSE}
+cat("Null Hypothesis: The proportion of republican candidate votes is less than or equal to 0.5\nAlternate Hypothesis: The proportion of candidates is greater than 0.5")
+```
+**Hypothesis:**<br />
+<br>$H_{o}$ : $p$ $\leq$ 0.5<br />
+<br>$H_{1}$ : $p$ > 0.5
+
+
+```{r question7_hypothesis}
+repbulic_can <- prop.test(nrow(filter(elections_result,elections_result$Votes == 2)), nrow(elections_result), 
+          alternative = "greater", 
+          p = 0.5,conf.level = 0.9)
+repbulic_can
+```
+
+
+```{r question7_infer,echo=FALSE}
+sprintf("As our p-value (%.3f) is less than the signficance value (0.1), There is sufficient evidence to support that the Republican candidate will the State and Networks can publish the results at 8:01 PM because the p-value is significantly lower indicating the stronger claim validity",repbulic_can$p.value)
+```
+## Question 8
+```{r question8_provided, echo=FALSE}
+cat("Given: A study conducted on the food spending on large town four person family comparing to National Average\nTo do: Conduct One-Sample Hypothesis testing two sided")
+```
+
+```{r question8_loaddataset}
+grocerybills <- read.csv("GroceryBills.csv")
+head(grocerybills,1)
+```
+
+# 8.a
+```{r question8a_hypothesis_statements, echo=FALSE}
+cat("Null Hypothesis: The Grocery Spending of Four-person family in large town is equal to $150(National Average)\nAlternate Hypothesis: The Grocery Spending of Four-person family in large town is not equal to $150(National Average)")
+```
+**Hypothesis:**<br />
+<br>$H_{o}$ : $\mu$ = 150<br />
+<br>$H_{1}$ : $\mu$ $\neq$ 150
+
+```{r question8a_hypothesis}
+grocery_bill_test <- t.test(grocerybills$Weekly_food_expense, alternative = "two.sided" , mu = 150)
+```
+
+```{r question8a_hypothesis_inf,echo=FALSE}
+sprintf("As the p-value of the test (%.5f) is extremely less than the 0.01 (supposed lowest confidence interval) we can say that there is sufficient evidence to support the claim that there is significant difference between large town and national four-family person spending",grocery_bill_test$p.value)
+```
+```{r question8a_hypothesis_final,echo=FALSE}
+cat("At all there major significance levels (0.1, 0.05, 0.01) we can reject the null hypothesis as all these significance values are greater than the p-value")
+```
+# 8.b
+```{r question_8b_hypothesis}
+sample_size_8b <- nrow(grocerybills)
+sample_sd_8b <- sd(grocerybills$Weekly_food_expense)
+t99 <- qt(0.995, df = sample_size_8b - 1, lower.tail = TRUE)
+
+left_interval_99_8b <- round(150 - (t99*sample_sd_8b/sqrt(sample_size_8b)),3)
+right_interval_99_8b <- round(150 + (t99*sample_sd_8b/sqrt(sample_size_8b)),3)
+
+
+t90 <- qt(0.95, df = sample_size_8b - 1, lower.tail = TRUE)
+
+left_interval_90_8b_2 <- round(150 - (t90*sample_sd_8b/sqrt(sample_size_8b)),3)
+right_interval_90_8b_2 <- round(150 + (t90*sample_sd_8b/sqrt(sample_size_8b)),3)
+```
+
+```{r question_8b_hypothesis_inf,echo=FALSE}
+sprintf("The test-stastic and sample means to reject the null hypothesis at the 1%% significance level is %.3f and values when less than %.3f and greater than %.3f",t99,left_interval_99_8b,right_interval_99_8b)
+```
+
+```{r question_8b_hypothesis_inf_2,echo=FALSE}
+sprintf("The test-stastic and sample means to reject the null hypothesis at the 10%% significance level is %.3f and values when less than %.3f and greater than %.3f",t90,left_interval_90_8b_2,right_interval_90_8b_2)
+```
+## Question 9
+```{r question9_provided, echo=FALSE}
+cat("Given: Manufactury company developed a demand prediction model assuming variance of daily demand is 250, but recently experiencing problems with the inventory\nTo do: Hypothesis testing to see if there is significant change in the variance")
+```
+
+```{r question9_dataset_load}
+demand_data <- read.csv("Demand.csv")
+head(demand_data,1)
+```
+
+
+```{r question9_hypothesis_statement,echo=FALSE}
+cat("Null Hypothesis: The variance of the daily demand is equal to 250\nAlternate Hypothesis:The variance of the daily demand is not equal to 250")
+
+```
+**Hypothesis:**<br />
+<br>$H_{o}$ : $\sigma^{2}$ = 250<br />
+<br>$H_{1}$ : $\sigma^{2}$ $\neq$ 250 
+
+```{r question9_hypothesis_test}
+demand_var <- varTest(demand_data$Demand, alternative = "two.sided", 
+        sigma.squared = 250)
+```
+
+```{r question9_hypothesis_inf,echo=FALSE}
+sprintf("As p-value (%.3f) is much greater than the significance value, there is no sufficient evidence to support the claim that the operation research is wrong with the assumption of demand variance is 250",demand_var$p.value)
+```
+
+## QUestion 10
+```{r question10_hypothesis_statements,echo=FALSE}
+cat("Null Hypothesis: Flight has the fuel for 15 more minutes to fly\nAlternate Hypothesis: Flight doesn't have the fuel for 15 more minutes")
+```
+
+```{r question10_hypothesis_type1and2,echo=FALSE}
+cat("Type 1 Error: When we reject that the Flight does have the fuel for 15 more minutes (Null hypothesis) but it's true, we are going to encounter FAA investigation and also endangering the other flights by prematurely try to land \nType 2 Error: When we fail to reject that the flight does have the fuel for 15 more minutes but it's false, we are endangering the human lifes in the flight by still flying in the air")
+```
+
+
+## Question 11
+
+```{r question11_provided,echo=FALSE}
+cat("Given:Consulting company BAY wants to know why Employees are leaving from the company, and their data has been provided\nTo Do: Understand why customers are leaving and analyze ways to retain employees")
+
+```
+
+```{r question11_load_dataset}
+bay_emp <- read.csv("BAY.csv")
+head(bay_emp,1)
+```
+
+# 11.a
+```{r question11_a_salary_1}
+mean_conf_intervals <- function(data_col){
+  sample_mean <- mean(data_col)
+  sample_size <- length(data_col)
+  sample_sd <- sd(data_col)
+  
+  t95 <- qt(0.975, df = sample_size - 1, lower.tail = TRUE)
+
+  left_interval_95 <- round(sample_mean - (t95*sample_sd/sqrt(sample_size)),3)
+  right_interval_95 <- round(sample_mean + (t95*sample_sd/sqrt(sample_size)),3)
+  
+  return(c(left_interval_95,right_interval_95))
+}
+
+salary_int_3years <- mean_conf_intervals(filter(bay_emp,Stayed.3.Years=="Yes")$Starting.Salary)
+salary_int_not_3years <- mean_conf_intervals(filter(bay_emp,Stayed.3.Years=="No")$Starting.Salary)
+
+mean_diff_conf_intervals <- function(data_col1,data_col2){
+  t_test_result <- t.test(data_col1, 
+            data_col2, 
+            var.equal = TRUE, 
+            paired = FALSE, 
+            conf.level = 0.95)
+
+  left_int_95 <- t_test_result$conf.int[1]
+  right_int_95 <- t_test_result$conf.int[2]
+  
+  return(c(round(left_int_95,3),round(right_int_95,3)))
+}
+
+salary_int_3years_diff <- mean_diff_conf_intervals(filter(bay_emp,Stayed.3.Years=="Yes")$Starting.Salary,filter(bay_emp,Stayed.3.Years=="No")$Starting.Salary)
+
+salary_int_3years_df <- data.frame(rbind(c(paste(salary_int_3years[1],"-",salary_int_3years[2])),c(paste(salary_int_not_3years[1],"-",salary_int_not_3years[2])),c(paste(salary_int_3years_diff[1],"-",salary_int_3years_diff[2]))))
+
+colnames(salary_int_3years_df) <- c("Mean Salary Confidence Interval")
+rownames(salary_int_3years_df) <- c("Employee with more than 3 years tenure","Employee with less than 3 years tenure","Difference in mean salary")
+
+salary_int_3years_df %>% kbl(caption = "Confidence Intervals") %>%
+  kable_styling("striped", full_width = T)
+```
+
+```{r question11a_inter}
+cat("With 95% confidence, the above interval would capture the true mean salary of various conditions mentioned above")
+```
+
+
+
+```{r question_11a_part_2}
+median_salary_emp <- median(bay_emp$Starting.Salary)
+
+propotion_interval_function <- function(sample_size,prop_value){
+  ifelse(((sample_size*prop_value)>5) & (((sample_size)*(1-prop_value)) >5),"The provided is large enough to conduct the analysis","The provided is not large enough to conduct the analysis")
+  
+  z95 <- qnorm(0.975, mean = 0, sd = 1, lower.tail = TRUE)
+  prop_left_4a <- round(prop_value - (z95 * sqrt(prop_value * (1 - prop_value)/sample_size)),3)
+  prop_right_4a <- round(prop_value + (z95 * sqrt(prop_value * (1 - prop_value)/sample_size)),3)
+  
+  return(c(prop_left_4a,prop_right_4a))
+}
+
+
+
+total_employees_less_median <- length(filter(bay_emp,Starting.Salary<=median_salary_emp)$Employee)
+emp_less_3years_prop <- length(filter(bay_emp,Starting.Salary<=median_salary_emp & bay_emp$Stayed.3.Years =="Yes")$Employee)/total_employees_less_median
+
+emp_less_3years_conf_int <- propotion_interval_function(total_employees_less_median,emp_less_3years_prop)
+
+
+total_employees_greater_median <- length(filter(bay_emp,Starting.Salary>median_salary_emp)$Employee)
+emp_greater_3years_prop <- length(filter(bay_emp,Starting.Salary>median_salary_emp & bay_emp$Stayed.3.Years =="Yes")$Employee)/total_employees_greater_median
+emp_greater_3years_conf_int <- propotion_interval_function(total_employees_greater_median,emp_greater_3years_prop)
+
+
+ifelse(total_employees_less_median*emp_less_3years_prop>5 & total_employees_less_median*(1-emp_less_3years_prop) > 5 & total_employees_greater_median*emp_greater_3years_prop >5 &
+total_employees_greater_median*(1-emp_greater_3years_prop) >5,"The provided sample is enough to find the confidence intervals","The provided sample is not enough to find the confidence intervals")
+
+
+employee_salary_prop <- prop.test(c(length(filter(bay_emp,Starting.Salary<=median_salary_emp & bay_emp$Stayed.3.Years =="Yes")$Employee), length(filter(bay_emp,Starting.Salary>median_salary_emp & bay_emp$Stayed.3.Years =="Yes")$Employee)), 
+          c(total_employees_less_median, total_employees_greater_median), alternative = "two.sided", 
+          conf.level = 0.95, correct = FALSE)
+
+employee_salary_prop_diff_left <- employee_salary_prop$conf.int[1]
+employee_salary_prop_diff_right <- employee_salary_prop$conf.int[2]
+
+emp_prop_3y_sal <- data.frame(rbind(c(paste(emp_less_3years_conf_int[1],"-",emp_less_3years_conf_int[2])),c(paste(emp_greater_3years_conf_int[1],"-",emp_greater_3years_conf_int[2])),c(paste(employee_salary_prop_diff_left,"-",employee_salary_prop_diff_right))))
+
+colnames(emp_prop_3y_sal) <- c("Proportion of Median Salary 3 years tenure Confidence Interval")
+rownames(emp_prop_3y_sal) <- c("Employee with less than Median salary","Employee with more than median salary","Difference in median salary proportion")
+
+
+emp_prop_3y_sal %>% kbl(caption = "Confidence Intervals") %>%
+  kable_styling("striped", full_width = T)
+```
+```{r question11a_inter_100}
+cat("With 95% confidence, the above interval would capture the true proportion of the 3 years tenure of various conditions mentioned above")
+```
+
+
+
+# 11.b
+```{r question_11b_part1}
+bay_emp$On.Road.Pct <- as.numeric(sub("%", "", bay_emp$On.Road.Pct))
+on_road_perc_int_3years <- mean_conf_intervals(filter(bay_emp,Stayed.3.Years=="Yes")$On.Road.Pct)
+on_road_perc_not_3years <- mean_conf_intervals(filter(bay_emp,Stayed.3.Years=="No")$On.Road.Pct)
+
+on_road_perc_int_3years_diff <- mean_diff_conf_intervals(filter(bay_emp,Stayed.3.Years=="Yes")$On.Road.Pct,filter(bay_emp,Stayed.3.Years=="No")$On.Road.Pct)
+
+on_road_perc_int_3years_diff <- data.frame(rbind(c(paste(on_road_perc_int_3years[1],"-",on_road_perc_int_3years[2])),c(paste(on_road_perc_not_3years[1],"-",on_road_perc_not_3years[2])),c(paste(on_road_perc_int_3years_diff[1],"-",on_road_perc_int_3years_diff[2]))))
+
+colnames(on_road_perc_int_3years_diff) <- c("Mean On Road Percent Confidence Interval")
+rownames(on_road_perc_int_3years_diff) <- c("Employee with more than 3 years tenure","Employee with less than 3 years tenure","Difference in mean on road percent")
+
+
+on_road_perc_int_3years_diff %>% kbl(caption = "Confidence Intervals") %>%
+  kable_styling("striped", full_width = T)
+```
+
+```{r question11a_inter_2,echo=FALSE}
+cat("With 95% confidence, the above interval would capture the mean on road percentage of the 3 years tenure of various conditions mentioned above")
+```
+
+
+
+```{r question_11b_part_2}
+median_orp_emp <- median(bay_emp$On.Road.Pct)
+
+
+total_employees_less_median_orp <- length(filter(bay_emp,On.Road.Pct<=median_orp_emp)$Employee)
+emp_less_3years_prop_orp <- length(filter(bay_emp,On.Road.Pct<=median_orp_emp & bay_emp$Stayed.3.Years =="Yes")$Employee)/total_employees_less_median_orp
+
+
+emp_less_3years_conf_int_orp <- propotion_interval_function(total_employees_less_median_orp,emp_less_3years_prop_orp)
+
+total_employees_greater_median_orp <- length(filter(bay_emp,On.Road.Pct>median_orp_emp)$Employee)
+emp_greater_3years_prop_orp <- length(filter(bay_emp,On.Road.Pct>median_orp_emp & bay_emp$Stayed.3.Years =="Yes")$Employee)/total_employees_greater_median_orp
+emp_greater_3years_conf_int <- propotion_interval_function(total_employees_greater_median_orp,emp_greater_3years_prop_orp)
+
+
+ifelse(total_employees_less_median_orp*emp_less_3years_prop_orp>5 & total_employees_less_median_orp*(1-emp_less_3years_prop_orp) > 5 & total_employees_greater_median_orp*emp_greater_3years_prop >5 &
+total_employees_greater_median_orp*(1-emp_greater_3years_prop) >5,"The provided sample is enough to find the confidence intervals","The provided sample is not enough to find the confidence intervals")
+
+employee_orp_prop <- prop.test(c(length(filter(bay_emp,On.Road.Pct<=median_orp_emp & bay_emp$Stayed.3.Years =="Yes")$Employee), length(filter(bay_emp,On.Road.Pct>median_orp_emp & bay_emp$Stayed.3.Years =="Yes")$Employee)), 
+          c(total_employees_less_median_orp, total_employees_greater_median_orp), alternative = "two.sided", 
+          conf.level = 0.95, correct = FALSE)
+
+employee_orp_prop_diff_left <- employee_orp_prop$conf.int[1]
+employee_orp_prop_diff_right <- employee_orp_prop$conf.int[2]
+
+emp_prop_3y_orp <- data.frame(rbind(c(paste(emp_less_3years_conf_int_orp[1],"-",emp_less_3years_conf_int_orp[2])),c(paste(emp_greater_3years_conf_int[1],"-",emp_greater_3years_conf_int[2])),c(paste(employee_orp_prop_diff_left,"-",employee_orp_prop_diff_right))))
+
+colnames(emp_prop_3y_orp) <- c("Proportion of On Road Percent with clients 3 years tenure Confidence Interval")
+rownames(emp_prop_3y_orp) <- c("Employee with less than Median ORP","Employee with more than Median ORP","Difference in median ORP proportion")
+
+emp_prop_3y_orp %>% kbl(caption = "Confidence Intervals") %>%
+  kable_styling("striped", full_width = T)
+```
+
+```{r question11a_inter_4,echo=FALSE}
+cat("With 95% confidence, the above interval would capture the proportion of on road percentage of the 3 years tenure of various conditions mentioned above")
+```
+
+
+# 11.c
+```{r question11_c_part1}
+on_road_perc_int_3years <- mean_conf_intervals(filter(bay_emp,Stayed.3.Years=="No")$Tenure)
+```
+
+```{r question11c_inter_5,echo=FALSE}
+sprintf("With 95%% confidence, the  interval (%.3f,%.3f) would capture the proportion of on road percentage of the 3 years tenure of various conditions mentioned above",on_road_perc_int_3years[1],on_road_perc_int_3years[2])
+```
+
+```{r question11c_whynot,echo=FALSE}
+cat("Since the tenure data is not available when the employee was having served for more than 3 years,it is not possible with the given data to calculate a confidence interval for the mean tenure at BAY among all systems analysts who leave BAY after three years")
+```
+
+
+# 11.d
+
+```{r question11d_part1}
+total_employees_3years_suni <- length(filter(bay_emp,Stayed.3.Years =="Yes")$Employee)
+emp_3years_prop_suni <- length(filter(bay_emp, State.Univ=="Yes" & Stayed.3.Years =="Yes")$Employee)/total_employees_3years_suni
+
+emp_3years_conf_int_suni <- propotion_interval_function(total_employees_3years_suni,emp_3years_prop_suni)
+
+emp_3years_prop_nuni <- length(filter(bay_emp,State.Univ=="No" & Stayed.3.Years =="Yes")$Employee)/total_employees_3years_suni
+
+emp_3years_conf_int_nuni <- propotion_interval_function(total_employees_3years_suni,emp_3years_prop_nuni)
+
+emp_3years_uni_df <- data.frame(rbind(c(paste(emp_3years_conf_int_suni[1],"-",emp_3years_conf_int_suni[2])),c(paste(emp_3years_conf_int_nuni[1],"-",emp_3years_conf_int_nuni[2]))))
+
+rownames(emp_3years_uni_df) <- c("Employees attended State University","Employees did not attend State University")
+colnames(emp_3years_uni_df) <- c("Confidence Intervals")
+
+
+emp_3years_uni_df %>% kbl(caption = "Confidence Intervals") %>%
+  kable_styling("striped", full_width = T)
+```
+
+
+```{r question11d_part2}
+total_employees_3years_scis <- length(filter(bay_emp,Stayed.3.Years =="Yes")$Employee)
+emp_3years_prop_scis <- length(filter(bay_emp, Stayed.3.Years=="Yes" & CIS.Degree =="Yes")$Employee)/total_employees_3years_scis
+
+emp_3years_conf_int_scis <- propotion_interval_function(total_employees_3years_scis,emp_3years_prop_scis)
+
+emp_3years_prop_ncis <- length(filter(bay_emp,Stayed.3.Years=="Yes" & CIS.Degree =="No")$Employee)/total_employees_3years_scis
+
+
+emp_3years_conf_int_ncis <- propotion_interval_function(total_employees_3years_scis,emp_3years_prop_ncis)
+
+emp_3years_cis_df <- data.frame(rbind(c(paste(emp_3years_conf_int_scis[1],"-",emp_3years_conf_int_scis[2])),c(paste(emp_3years_conf_int_ncis[1],"-",emp_3years_conf_int_ncis[2]))))
+
+
+rownames(emp_3years_cis_df) <- c("Employees graduated CIS","Employees not graduated CIS")
+colnames(emp_3years_cis_df) <- c("Confidence Intervals")
+
+emp_3years_cis_df %>% kbl(caption = "Confidence Intervals") %>%
+  kable_styling("striped", full_width = T)
+```
+
+```{r question11_insights,echo=FALSE}
+cat("Analysis: 1.As the true mean salary confidence intervals haven't got much difference and in-fact the employees with less than 3 years tenure has the greater values. So we could say that the employee starting salary is not impacting the tenure in the company and the same can be based said from the proportion values as well.\n 2. Similar to the salaries, the employees with higher on-road percentage with clients are leaving the company within less than 3 years than employees with more than\n3. The proportion of the employees graduated in state university stayed for 3 years is lesser than the proportion of the employees graduated in other universities\n 4. The graduates with CIS tentatively to stay 3 years more than the other degree folks")
+```
+```{r question11_recomendations,echo=FALSE}
+cat("Recommendations:\n1. It may not be necessary to increase the salary for retaining the employees\n2. Company might need to focus on hiring in other universities than the state university\n3. No need to change the strategy of hiring graduates from CIS")
+```
+
+
+
+## Question 12
+```{r question12_provided,echo=FALSE}
+cat("Given: 50 sample births are taken to study if the mothers are leaving the hospital in less than 2 days\nTo do: Find the power of the test and minimum sample size required for the power 80%")
+```
+
+```{r question12_hypothesis_statement,echo=FALSE}
+cat("Null Hypothesis: The proportion of the mothers who have an LOS less than 2 days is less than or equal to 0.5\nAlternate Hypothesis: The proportion of the mothers who have a LOS less than 2 days is more than 0.5")
+```
+**Hypothesis:**<br />
+<br>$H_{o}$ : $p$ $\leq$ 0.5<br />
+<br>$H_{1}$ : $p$ > 0.5
+
+```{r question12_hypothesis}
+mother_2days <- pwr.p.test(ES.h(0.6,0.5), n=50,
+           sig.level = 0.1,
+           power = NULL,
+           alternative = "greater")
+```
+
+
+```{r question12_hypothesis1_result,echo=FALSE}
+sprintf("The power of the test when sample size is 50, true proportion is 0.6 and significance level is 0.1 is %.f%%",mother_2days$power*100)
+```
+```{r question12_hypothesis_2}
+mother_2days_2 <- pwr.p.test(ES.h(0.6,0.5), n=NULL,
+           sig.level = 0.1,
+           power = 0.8,
+           alternative = "greater")
+```
+
+
+```{r question12_hypothesis2_result,echo=FALSE}
+sprintf("The power of the test when required power is 80%%, true proportion is 0.6 and significance level is 0.1 is %.f",ceiling(mother_2days_2$n))
+```
+
+
+
+
+
+
+

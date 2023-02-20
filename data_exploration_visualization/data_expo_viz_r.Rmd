@@ -1,0 +1,1364 @@
+---
+title: "Data Exploration"
+author:
+- Vamsee Krishna Reddy Narahari
+output: html_document
+date: '2022-08-09'
+---
+
+```{r setup, include=FALSE}
+options(warn=-1) ##Ignoring the warnings
+knitr::opts_chunk$set(echo = TRUE)
+#load required libraries
+list.of.packages <- c("ggplot2", "readr","dplyr","psych","data.table","knitr","kableExtra","tidyverse","lubridate","gmodels","gridExtra","reshape2")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
+
+library("readr")
+library("dplyr")
+library("psych")
+library("ggplot2")
+library("data.table")
+library("knitr")
+library("kableExtra")
+library("tidyverse")
+library("lubridate")
+library("gmodels")
+library("gridExtra")
+library("reshape2")
+```
+
+
+```{r question_1_given, echo=FALSE}
+cat("Given: Monthly Dow Jones closing values from January 1950 /n
+To do: Calculate returns over time, assess Normality and perform EDA  ")
+```
+
+```{r dataset}
+dow <- read.csv("dow.csv") ## Load the dataset
+dow$Closing.Values <- dow$Closing.Values <- as.numeric(gsub(',', '', dow$Closing.Values))## Closing day values to numeric
+sapply(dow,class) ## print the data types of the dataframe
+```
+```{r data_display_1}
+head(dow,2)
+```
+
+```{r level_check_1}
+ifelse(
+  nrow(dow %>%                          ##Level Check
+  add_count(Month) %>%
+  filter(n > 1))==0,"The returns of the data are at Month level","Level is different")
+```
+
+
+```{r basic_summary}
+summary(dow) #summary of the data
+```
+
+```{r, echo=FALSE}
+cat("There are total of 860 closing month values from 1950 January.")
+```
+---
+Calculate the monthly returns and respective growth factors
+---
+```{r returns_cal} 
+dow <- mutate(dow, returns = (Closing.Values - lag(Closing.Values))/lag(Closing.Values)) ##returns
+dow$growth_factor <- dow$returns + 1 ##Adding 1 to get the growth factor
+```
+
+
+```{r 1.a}
+geometric_mean_1a <- round(100*(geometric.mean(dow$growth_factor)-1), digits = 3)
+```
+
+```{r, echo=FALSE}
+cat("The average Dow return over the period is",geometric_mean_1a)
+```
+
+
+
+```{r 1.b}
+ggplot(dow, aes(x=returns)) + geom_histogram(binwidth = 0.01) + ggtitle("Distribution of the Dow Jones Returns") + xlab("Returns of the DJIA") + ylab("Frequency")
+```
+
+```{r, echo=FALSE}
+cat("Returns of the DJIA over the period appears to be in a normal distribution with few extreme values")
+```
+
+
+```{r 1.c}
+mean_returns <- mean(dow$returns,na.rm = TRUE) #mean of the returns
+stddev_returns <- sd(dow$returns, na.rm = TRUE) #sd of the returns
+
+##Calculate the boundaries of all the standard deviations
+one_sd_lower   <- mean_returns - 1*stddev_returns
+one_sd_upper   <- mean_returns + 1*stddev_returns
+two_sd_lower   <- mean_returns - 2*stddev_returns
+two_sd_upper   <- mean_returns + 2*stddev_returns
+three_sd_lower <- mean_returns - 3*stddev_returns
+three_sd_upper <- mean_returns + 3*stddev_returns
+
+total_values <- length(dow$returns) - 1 #Sub 1 to remove the na value at the start
+
+# Observations within 1 SD 
+returns_within_onesd <- length(which(dow$returns >= one_sd_lower & dow$returns <= one_sd_upper))
+returns_percent_within_onesd <- 100*(returns_within_onesd/total_values)
+
+# Observations within 2 SD 
+returns_within_twosd <- length(which(dow$returns >= two_sd_lower & dow$returns <= two_sd_upper))
+returns_percent_within_twosd <- 100*(returns_within_twosd/total_values)
+
+# Observations within 3 SD 
+returns_within_threesd <- length(which(dow$returns >= three_sd_lower & dow$returns <= three_sd_upper))
+returns_percent_within_threesd <- 100*(returns_within_threesd/total_values)
+```
+
+
+```{r 1.c_result, echo=FALSE}
+sprintf("The percentages of the DJIA returns within the 1st, 2nd and 3rd standard deviations are %.2f, %.2f and %.2f ,looking at the values the returns of the DJIA adhere to the Emperical Value. The 1st standard deviation percentage might have been slightly effected by the extreme values in the dataset",returns_percent_within_onesd, returns_percent_within_twosd, returns_percent_within_threesd)
+```
+
+
+```{r 1.d}
+ggplot(data = dow, aes(y = returns)) + geom_boxplot(outlier.colour="red") + 
+  coord_flip() + ylab("Returns") +
+  ggtitle("DJIA Returns") ##Boxplot of the returns
+```
+```{r 1.d_result_3, echo=FALSE}
+cat("The boxplots showcases that the data is in normally distribution with few outliers")
+```
+
+```{r 1.d_2}
+returns_five <- fivenum(dow$returns,na.rm = TRUE)
+```
+
+```{r 1.d_result_2, echo=FALSE}
+cat("Five Number Summary of the DJIA returns","\nMinimum:",returns_five[1],
+    "\nQ1:", returns_five[2],
+    "\nMedian:",returns_five[3],
+    "\nQ3:",returns_five[4],
+    "\nMaximum",returns_five[5])
+```
+
+```{r fivenum_plot, echo=FALSE}
+boxplot(returns_five, main = "Five Number Summary", ylab="Values")
+```
+```{r q1_q2_q3, echo=FALSE}
+cat("Over the 25th percentile of the returns are in negative, median is close to zero, and third quartile is positive, showcasing the stock market up and downs. The relative big difference between q3 and q2 displays that market always had gained bigger when its rising")
+```
+
+```{r 1.e}
+IQR <- returns_five[4]-returns_five[2] #IQR calculation
+
+dow <- mutate(dow, outlier_detection = ifelse(((returns >= returns_five[4] + 1.5*IQR) & (returns < returns_five[4] + 3*IQR)) | ((returns <= returns_five[2] - 1.5*IQR)&(returns > returns_five[2] - 3*IQR)), "mild outlier", ifelse((returns >= returns_five[4] + 3*IQR) | (returns <= returns_five[2] - 3*IQR),"extreme outlier","not an outlier"))) #Checking the returns for the outliers
+
+```
+
+
+```{r 1.e result}
+sort_order <- c("extreme outlier", "mild outlier","not an outlier")
+dow$outlier_detection <- factor( as.character(dow$outlier_detection), levels=sort_order )
+dow_sorted <- dow[order(dow$outlier_detection),]  # Reorder data frame
+print(head(dow_sorted, 5)) #showing only the top five values
+```
+
+```{r, echo=FALSE}
+cat("Note: Displaying only the first five results to avoid huge display of values")
+```
+
+```{r 1_final_analysis, echo=FALSE}
+cat("The dataset provided tends to follow the normal distribution, so we can apply further statistical analysis such as hypothesis testing to prove any reasonings. \nMoreover we cannot remove any kind of outliers, as the extreme outlier in the October 1987 has been the Black Monday, there are very well chances for the occurrences of the similar fall and rises in the stock market")
+```
+
+
+
+```{r 2_initial,echo=FALSE}
+
+cat("Given: Melvyl stores, a women clothing apparel store conducted a campaign to attract new customers by providing the discount coupons. Management wants to understand the effectiveness of the campaign from the 100 sample transactions\nTo Do: Univarite, Bivarite and Multivariate Analysis. ")
+
+```
+
+
+```{r 2_setup}
+melvyl <- read.csv("Melvyl.csv") #Load the dataset
+melvyl <- melvyl[c("Customer","Type.of.Customer","Items","Net.Sales","Method.of.Payment","Gender","Marital.Status","Age")] ##Remove the unnecessary columns populated
+head(melvyl,1)
+```
+
+```{r 2_data_summary}
+summary(melvyl[c("Items","Net.Sales","Age")]) 
+```
+
+```{r 2_data_summary_2}
+#Aggregates of the Categorical Columns
+customerttype_agg <- aggregate(melvyl$Customer, by=list(melvyl$Type.of.Customer), FUN=length)
+colnames(customerttype_agg) <- c("Customer Type", "Count") #Changing the column names
+
+paymentmethod_agg <- aggregate(melvyl$Customer, by=list(melvyl$Method.of.Payment), FUN=length)
+colnames(paymentmethod_agg) <- c("Payment Method", "Count") 
+
+gender_agg <- aggregate(melvyl$Customer, by=list(melvyl$Gender), FUN=length)
+colnames(gender_agg) <- c("Gender", "Count")
+
+maritalstatus_agg <- aggregate(melvyl$Customer, by=list(melvyl$Marital.Status), FUN=length)
+colnames(maritalstatus_agg) <- c("Marital Status", "Count")
+```
+
+
+```{r 2_data_summary_result_display, echo=FALSE}
+#Display the results
+
+kable(customerttype_agg) %>%
+  kable_styling(full_width = FALSE, position = "float_left")
+kable(maritalstatus_agg) %>%
+  kable_styling(full_width = FALSE, position = "float_left")
+kable(gender_agg) %>%
+  kable_styling(full_width = FALSE, position = "float_left")
+kable(paymentmethod_agg) %>%
+  
+  kable_styling(full_width = FALSE, position = "left")
+```
+
+
+
+```{r 2_a_plots, figures-side, fig.show="hold", out.width="33%"}
+##Distribution of Numerical Variables
+
+ggplot(melvyl, aes(x=Items)) + geom_histogram(binwidth = 1) + ggtitle("Distribution of the Items") + xlab("Items sold") + ylab("Frequency") #Item Distribution
+
+ggplot(melvyl, aes(x=Net.Sales)) + geom_histogram(binwidth = 10) + ggtitle("Distribution of the Sale Amounts") + xlab("Sales") + ylab("Frequency") #Sale Distribution
+
+ggplot(melvyl, aes(x=Age)) + geom_histogram(binwidth = 10) + ggtitle("Distribution of the Shoppers Age") + xlab("Age") + ylab("Frequency") #Age Distribution
+```
+
+```{r 2_a_plots_inference, echo=FALSE}
+cat("Most customers bought only 1 or 2 items with net sales in the range of USD 20-80")
+```
+
+
+```{r 2_a_plots_2, figures-side, fig.show='hold', out.width="50%"}
+##Distribution of Categorical Variables
+
+ggplot(melvyl, aes(x=Type.of.Customer)) + geom_bar() + ggtitle("Distribution of the Customers Type") + xlab("Customer Type") + ylab("Count")#Customer Type Distribution
+
+payment_melvyl<- melvyl %>% 
+  group_by(Method.of.Payment) %>% 
+  summarise(value_count = n())
+
+ggplot(payment_melvyl, aes(x=reorder(Method.of.Payment,-value_count), y=value_count)) + geom_bar(stat="Identity") + ggtitle("Distribution of the Payment methods") + xlab("Payment methods") + ylab("Count") + theme(legend.position = "none")
+```
+
+```{r 2_a_plots_3, figures-side, fig.show='hold', out.width="50%"}
+##Distribution of Categorical Variables
+ggplot(melvyl, aes(x=Gender)) + geom_bar() + ggtitle("Distribution of the Gender") + xlab("Gender") + ylab("Count")
+
+ggplot(melvyl, aes(x=Marital.Status)) + geom_bar() + ggtitle("Distribution of the Marital Status") + xlab("Marital Status") + ylab("Count") #Marital Status 
+```
+
+```{r 2_a_univarite_summary, echo=FALSE}
+cat("Assuming the sample is in proportion of the population, approximately 70% of the sales occurred during the day are due to the promotions or campaign\nMost of the customers in the sample preferred using the Proprietary cards for the transactions, raising the question of relation between the promotions and payment methods\nHaving  high female proportion in the sales does make sense as it is a women apparel store but high proportion of the married customers needs to be evaluated")
+
+```
+
+
+```{r 2_a_plot_analysis, echo=FALSE}
+cat("The uni-variate analysis suggests to check for any relations between certain combinations such as: \n Customer Type vs Payment Method\n Customer Type vs Gender\n Gender vs Payment Method\n Gender vs Marital Status")
+```
+
+```{r 2_a_plots_4, figures-side, fig.show='hold', out.width="25%"}
+##Bi Variate Analysis to understand the customers (Customer Profiling)
+ggplot(melvyl, aes(x=Method.of.Payment,fill=Type.of.Customer)) + geom_bar(position="fill") + labs(y="Proportion", x="Payment Method",fill = "Customer Type", title = "Proportion of Customer Type across Payment Methods") + theme_minimal() + scale_fill_grey(start = 0.2, end = 0.8, na.value = "red", aesthetics = "fill")
+
+ggplot(melvyl, aes(x=Gender,fill=Type.of.Customer)) + geom_bar(position="fill") + labs(y="Proportion", x="Customer Type",fill = "Customer Type", title = "Proportion of Customer Type across Gender") + theme_minimal() + scale_fill_grey(start = 0.2, end = 0.8, na.value = "red", aesthetics = "fill") 
+
+ggplot(melvyl, aes(x=Method.of.Payment,fill=Gender)) + geom_bar(position="fill") + labs(y="Proportion", x="Customer Type",fill = "Gender", title = "Proportion of Gender across Customer Type") + theme_minimal() + scale_fill_grey(start = 0.2, end = 0.8, na.value = "red", aesthetics = "fill") 
+
+ggplot(melvyl, aes(x=Gender,fill=Marital.Status)) + geom_bar(position="fill") + labs(y="Proportion", x="Gender",fill = "Marital Status", title = "Proportion of Gender across Marital Status") + theme_minimal() + scale_fill_grey(start = 0.2, end = 0.8, na.value = "red", aesthetics = "fill") 
+
+```
+
+```{r 2_a_plots_4_analysis,echo=FALSE}
+cat("Clearly most of the promotioned customers used the propritery cards, implying these customers might have been already shopping in other stores and we successfully attracted them to shop with us/nMajority of the female customers used propritery cards, future campaigns/promotions can be associated with this card and get additional income from the card services/nCouldn't still answer the why there is only small proportion of the single marital status customers need further data to evaluate")
+```
+
+
+```{r 2_a_plots_age, figures-side, fig.show='hold', out.width="33%"}
+##Bucketing the ages into groups to get better insights into the Customers and their preferences
+customer_age <- c(20,30,40,50,60,70,80)
+customer_age_group <- c("20-30","30-40","40-50","50-60","60-70","70-80")
+
+setDT(melvyl)[ , agegroups := cut(Age, 
+                                breaks = customer_age, 
+                                right = FALSE, 
+                                labels = customer_age_group)] ##Group the customers into their respective buckets
+
+ggplot(melvyl, aes(x=agegroups)) + geom_bar() + ggtitle("Distribution of the Age Groups") + xlab("Age Group") + ylab("Count")
+
+ggplot(melvyl, aes(x=agegroups,fill=Type.of.Customer)) + geom_bar(position="fill") + labs(y="Proportion", x="Age Groups",fill = "Customer Type", title = "Proportion of Customer Type across Age Groups") + theme_minimal() + scale_fill_grey(start = 0.2, end = 0.8, na.value = "red", aesthetics = "fill") 
+
+ggplot(melvyl, aes(x=agegroups,fill=Method.of.Payment)) + geom_bar(position="fill") + labs(y="Proportion", x="Age Groups",fill = "Payment Method", title = "Proportion of Payment Methods across Age Groups") + theme_minimal() + scale_fill_grey(start = 0.2, end = 0.8, na.value = "red", aesthetics = "fill")
+```
+
+```{r 2_a_plots_age_analysis, echo=FALSE}
+cat("While 40-50 bucket consisting the highest customers, the promotional proportion and propriteray card payments are relatively low. We may need to review our discounts to see if that age group cannot utilize them the best /n Need data on what kind of discounts has been given")
+
+```
+
+
+```{r 2_a_plots_maritalstatus,figures-side, fig.show='hold', out.width="50%"}
+ggplot(melvyl, aes(x=Marital.Status,fill=Type.of.Customer)) + geom_bar(position="fill") + labs(y="Proportion", x="Marital Status",fill = "Age Group", title = "Proportion of Customer Type across Marital Status") + theme_minimal() + scale_fill_grey(start = 0.2, end = 0.8, na.value = "red", aesthetics = "fill")
+
+ggplot(melvyl, aes(x=Marital.Status,fill=Method.of.Payment)) + geom_bar(position="fill") + labs(y="Proportion", x="Marital Status",fill = "Payment Method", title = "Proportion of Payment Methods across Marital Status") + theme_minimal() + scale_fill_grey(start = 0.2, end = 0.8, na.value = "red", aesthetics = "fill")
+```
+
+```{r 2_a_plots_marital_status_analysis, echo=FALSE}
+cat("Need more sample data or further variables to understand the marital status impact on the campaign. Is it only the sample like that or we attracted the customers only with married status")
+```
+
+
+```{r 2_b}
+#Creating the buckets on net sales 
+melvyl$sales_bucket <- cut(melvyl$Net.Sales, 10, dig.lab = 4, include.lowest = TRUE, right=FALSE)
+
+table(melvyl$Type.of.Customer,melvyl$sales_bucket) #crosstable of the sales
+```
+
+```{r 2_b_2}
+#Analyze the number of items in the respective sales bucket
+sales_group <- aggregate(melvyl$Customer, by=list(melvyl$sales_bucket), FUN=length)
+colnames(sales_group) <- c("Sales Bucket", "No. of Customer") #Changing the column names
+
+items_sold_bucket <- aggregate(melvyl$Items, by=list(melvyl$sales_bucket), FUN=sum)
+colnames(items_sold_bucket) <- c("Sales Bucket", "Total Items Sold") 
+```
+
+```{r 2_b_2_display, echo=FALSE}
+kable(sales_group) %>%
+  kable_styling(full_width = FALSE, position = "float_left")
+kable(items_sold_bucket) %>%
+  kable_styling(full_width = FALSE, position = "left")
+```
+
+
+```{r 2_b_analysis, echo=FALSE}
+cat("From the above, the highest net sales are dominated by the Discounted Customers. Probably, the discounts have attracted the customers to buy the higher number of items")
+```
+
+
+```{r 2_c}
+ggplot(melvyl, aes(x=Net.Sales)) + geom_histogram(binwidth = 20) + ggtitle("Distribution of the Sale Amounts") + xlab("Sales") + ylab("Frequency") #Sale Distribution
+```
+
+```{r 2_c_2}
+
+mean_sales <- mean(melvyl$Net.Sales,na.rm = TRUE) #mean of the returns
+stddev_sales <- sd(melvyl$Net.Sales, na.rm = TRUE) #sd of the returns
+
+##Calculate the boundaries of all the standard deviations
+one_sd_lower   <- mean_sales - 1*stddev_sales
+one_sd_upper   <- mean_sales + 1*stddev_sales
+two_sd_lower   <- mean_sales - 2*stddev_sales
+two_sd_upper   <- mean_sales + 2*stddev_sales
+three_sd_lower <- mean_sales - 3*stddev_sales
+three_sd_upper <- mean_sales + 3*stddev_sales
+
+
+total_values <- length(melvyl$Net.Sales)
+
+# Observations within 1 SD 
+sales_within_onesd <- length(which(melvyl$Net.Sales >= one_sd_lower & melvyl$Net.Sales <= one_sd_upper))
+sales_percent_within_onesd <- 100*(sales_within_onesd/total_values)
+
+# Observations within 2 SD 
+sales_within_twosd <- length(which(melvyl$Net.Sales >= two_sd_lower & melvyl$Net.Sales <= two_sd_upper))
+sales_percent_within_twosd <- 100*(sales_within_twosd/total_values)
+
+# Observations within 3 SD 
+sales_within_threesd <- length(which(melvyl$Net.Sales>= three_sd_lower & melvyl$Net.Sales <= three_sd_upper))
+sales_percent_within_threesd <- 100*(sales_within_threesd/total_values)
+```
+
+
+```{r 2_c_2_result, echo=FALSE}
+cat("The values percentages of the DJIA returns within the standard deviations are",sales_percent_within_onesd, sales_percent_within_twosd, sales_percent_within_threesd)
+```
+
+
+```{r 2_c_3}
+ggplot(data = melvyl, aes(y = Net.Sales)) + geom_boxplot(outlier.colour="red") + 
+  coord_flip() + ylab("Sales") +
+  ggtitle("Net Sales") ##Boxplot of the Sales
+```
+
+
+```{r 2_c_4}
+sales_five <- fivenum(melvyl$Net.Sales,na.rm = TRUE)
+```
+
+```{r 2_c_4_plot}
+boxplot(sales_five, main = "Sales Five Number Summary", ylab="Values")
+```
+
+```{r 2_c_analysis, echo=FALSE}
+cat("As expected sales are not normally distributed as the items bought might be across categories and prices as well as number of items sold. Untill unless we standardize the data to a set of category and divide by number of items, we won't be observing normally distributed sales data\nMoreover the data is right skewed which can be observed from both the histogram and box plots\nMost of the sales are in the range of 30-100 (Q1-Q3)/nAlthough there are outliers, these need not be eliminated for analysis until unless these are entry errors as people tend to buy more during the discounts period")
+
+```
+
+```{r 2_c_4_bivariate, figures-side, fig.show='hold', out.width="50%"}
+# Sales distribution over classification of Customers
+ggplot(melvyl, aes(x=Type.of.Customer, y=Net.Sales)) + geom_bar(stat="sum") + ggtitle("Customer Type wise Sales") + xlab("Customer Type") + ylab("Net Sales") + theme(legend.position = "none")
+
+ggplot(melvyl, aes(x=Method.of.Payment, y=Net.Sales)) + geom_bar(stat="sum") + ggtitle("Payment Method wise Sales") + xlab("Payment Method") + ylab("Net Sales") + theme(legend.position = "none")
+```
+
+```{r 2_c_4_bivariate_2, figures-side, fig.show='hold', out.width="50%"}
+ggplot(melvyl, aes(x=Gender, y=Net.Sales)) + geom_bar(stat="sum") + ggtitle("Gender wise Sales") + xlab("Gender") + ylab("Net Sales") + theme(legend.position = "none")
+
+ggplot(melvyl, aes(x=Marital.Status, y=Net.Sales)) + geom_bar(stat="sum") + ggtitle("Marital Status wise Sales") + xlab("Marital Status") + ylab("Net Sales") + theme(legend.position = "none")
+```
+
+
+```{r 2_d_2, figures-side, fig.show='hold', out.width="50%"}
+#Visualize the sales and items sold with respect to age groups
+ggplot(melvyl, aes(x=agegroups, y=Net.Sales)) + geom_bar(stat="sum") + ggtitle("Age Group wise Sales") + xlab("Age Group") + ylab("Net Sales") + theme(legend.position = "none")
+
+ggplot(melvyl, aes(x=agegroups, y=Items)) + geom_bar(stat="sum") + ggtitle("Age Group wise Items sold") + xlab("Age Group") + ylab("Items sold") + theme(legend.position = "none")
+```
+
+```{r 2_d}
+#Scatter plot between Age and Sales
+ggplot(melvyl, aes(x=Age, y=Net.Sales)) + geom_point() + geom_point(size=3, shape=20) + labs(y="Net Sales", x="Age", title = "Net Sales vs Age") + geom_abline(color="red")
+```
+
+
+```{r 2_d_3}
+#Calculate the correlation and Covariance
+sales_age_cov <- cov(melvyl$Age, melvyl$Net.Sales)
+sales_age_cor <- cor(melvyl$Age, melvyl$Net.Sales)
+```
+
+```{r 2_d_3_output, echo=FALSE}
+cat("The covariance and correlation values for the Net Sales and Age are",sales_age_cov,"and",sales_age_cor,"respectively")
+```
+
+```{r 2_d_analysis, echo=FALSE}
+cat("The scatterplots, covariance and correlation suggests there is no relation ship between the Sales and Age\nMoreover the bar charts between the sales and items sold vs Age groups has no abnormality in comparison")
+```
+
+```{r 2_KeyTakeAways, echo=FALSE}
+cat("With 70% of the transactions being on discount and encouraged buy of more number of items from Customers showcases that the discounts have helped the store to get traction from new customers\nWe can further increase the efficiency of the promotion by providing more discounts on the Propriteray cards and provide apt discounts for the age group 40-50\nHaving more data such as type of promotion, product categories would help further deep into the campaign")
+```
+
+
+
+
+```{r 3_setup, echo=FALSE}
+cat("Given: The transactions of a Super Market for the past 2 years containing the customer data, Store information, transaction details and date of purchase\nTo Do: Exploratory Data Analysis of the provided data")
+
+```
+
+```{r 3_initiation}
+transactions <- read.csv("SuperMarketTransactions.csv") ## Load the dataset
+transactions$Revenue <- parse_number(transactions$Revenue) ##Convert the dollar symbol values to numericals
+
+head(transactions,1)
+```
+
+
+
+```{r 3_a}
+##Boxplots over the State or Province
+ggplot(transactions, aes(x=State.or.Province,y=Revenue)) + geom_boxplot(outlier.colour="red") + labs(title="Revenue boxplots across States or Province",x="State or Province",y="Revenue") 
+
+```
+```{r 3_a_2, echo=FALSE}
+cat("Most of the distributions of the are slightly right skewed except for the Yucatan province which probably symetric or slight right skewed, inference from the boxplots.\n Note: Need further analysis for confirmation")
+```
+
+
+
+```{r 3_b}
+##Boxplots for only USA states
+
+ggplot(filter(transactions,Country=='USA'), aes(x=State.or.Province,y=Revenue)) + geom_boxplot(outlier.colour="red") + labs(title="Revenue boxplots across States or Province",x="State or Province",y="Revenue")
+```
+
+
+```{r 3_c}
+#State Wise Revenue
+state_transactions <- transactions %>% 
+                          group_by(State.or.Province) %>% 
+                          summarize(Revenue=sum(Revenue))
+
+ggplot(state_transactions, aes(reorder(x=State.or.Province,-Revenue), y=Revenue)) + geom_bar(stat="sum") + ggtitle("State wise Revenue") + xlab("State/Province") + ylab("Revenue") + theme(legend.position = "none")
+```
+
+
+```{r 3_d}
+#Product Category Wise Revenue
+product_wise_transactions <- transactions %>% 
+                          group_by(Product.Category) %>% 
+                          summarize(Revenue=sum(Revenue))
+ggplot(product_wise_transactions, aes(reorder(x=Product.Category,-Revenue), y=Revenue)) + geom_bar(stat="sum") + ggtitle("Product Category wise Revenue") + xlab("Product Category") + ylab("Revenue") + theme(legend.position = "none", axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+```
+
+```{r 3_e}
+##State Wise Transactions Count
+state_transactions_count <- transactions %>% 
+                          group_by(State.or.Province) %>% 
+                          summarize(state_count=n())
+
+ggplot(state_transactions_count, aes(reorder(x=State.or.Province,-state_count),y=state_count)) + geom_bar(stat="Identity") + ggtitle("State wise Transactions Count") + xlab("State/Province") + ylab("No. of Transactions") + theme(legend.position = "none")
+```
+
+```{r 3_f}
+total_shoppers <- length(unique(transactions$Customer.ID)) #Total Shoppers
+shoppers_morethan1 <- length(unique(filter(transactions,Children>1)$Customer.ID)) #For children greater than 1
+shoppers_morethan1_prop <- shoppers_morethan1/total_shoppers
+
+cat("The proportion of shoppers with more than one child is",shoppers_morethan1_prop)
+```
+
+
+```{r 3_g}
+transactions$purchase_monthyear <- as.Date(transactions$Purchase.Date, format= "%m/%d/%Y") #Change the dateformat
+
+transactions_3g <- filter(transactions, purchase_monthyear>=as.Date("2017-01-01") & purchase_monthyear<=as.Date("2017-02-28")) #Filter between for 2 months
+
+transactions_3g$monthyear <- format(transactions_3g$purchase_monthyear,format="%Y-%m") #Convert the format to month and year
+
+
+ggplot(transactions_3g, aes(x=monthyear, y=Revenue)) + geom_bar(stat="sum") + ggtitle("Purchase Month wise Revenue") + xlab("State/Province") + ylab("Revenue") + theme(legend.position = "none") 
+```
+
+
+```{r 3_h}
+CrossTable(transactions$Gender, transactions$Product.Family) ##Cross Table for Gender and Product Family, showcasing the frequency
+```
+
+
+```{r 3_i}
+total_shoppers <- length(unique(transactions$Customer.ID)) ##Total Shoppers
+shoppers_single_homeow <- length(unique(filter(transactions,Marital.Status=="S" & Homeowner=="Y")$Customer.ID)) ##Filter for single and homeowner shoppers
+shoppers_single_homeow_prop <- shoppers_single_homeow/total_shoppers
+
+cat("The proportion of shoppers with more than one child is",shoppers_single_homeow_prop)
+```
+
+```{r, echo=FALSE}
+Shoppers_byGender <- 
+transactions %>%
+  group_by(Gender) %>%
+  summarise(freq_customer = n_distinct(Customer.ID)) %>%
+  arrange(desc(freq_customer))
+
+Shoppers_byGender
+
+transactions %>% group_by(Gender) %>% summarise(freq_customer = n_distinct(Customer.ID))
+```
+
+
+
+```{r 3_j, figures-side, fig.show='hold', out.width="50%"}
+
+transactions_3j <- transactions %>% group_by(Gender) %>% summarise(freq_customer = n_distinct(Customer.ID))
+transactions_3j 
+
+ggplot(transactions_3j, aes(x='',y=freq_customer,fill=Gender)) +
+  geom_bar(stat='Identity')  + ggtitle("Gender Frequency") + coord_polar("y", start=0) + scale_fill_grey() + theme_minimal() 
+
+ggplot(transactions_3j, aes(x = Gender,y =freq_customer/sum(freq_customer))) +  
+  geom_bar(stat='Identity') + scale_y_continuous(labels=scales::percent) + labs(y="Percentage of Frequency",title="Gender percentage distribution")
+```
+
+## Question 4
+
+```{r 4_given, echo=FALSE}
+cat("Given: The customer demography has been provided for analyzing the behaviour of the customers who are churning.\nTo Do: Exploratory data analysis on the provided data would highlight the pain points of the customers who are going to churn")
+
+```
+
+```{r 4_initiation}
+churn <- read.csv("CellphoneMarket.csv")
+
+head(churn,1)
+```
+
+```{r 4_churn_level_check}
+churn %>%                          ##Level Check
+  add_count(Customer) %>%
+  filter(n > 1)
+```
+
+# Customer Behaviour
+```{r 4_churn_distribution}
+ggplot(churn, aes(x=Churn.)) + geom_bar() + ggtitle("Distribution of the Customers Churning") + xlab("Churn") + ylab("Count")
+```
+```{r 4_churn_distribution_text, echo=FALSE}
+customers_chur <- length(filter(churn,Churn.=="Yes")$Customer)/length(churn$Customer)
+
+sprintf("The customers churn proportion in the provided dataset is %.3f.",customers_chur)
+```
+```{r 4_int_voic_plans, fig.show='hold', out.width="50%"}
+ggplot(churn, aes(x=International.Plan,fill=Churn.)) + geom_bar(position="fill") + ggtitle("Customers International Plan Preference") + xlab("International Plan") + ylab("Count") + labs(fill="Customer Churning") + scale_fill_grey(start = 0.2, end = 0.8, na.value = "red", aesthetics = "fill") 
+
+ggplot(churn, aes(x=Voice.Mail.Plan,fill=Churn.)) + geom_bar(position="fill") + ggtitle("Customers Voice Mail Plan Preference") + xlab("Voice Mail") + ylab("Count") + scale_fill_grey(start = 0.2, end = 0.8, na.value = "red", aesthetics = "fill") 
+```
+
+```{r 4_eda_churn}
+ref_col  <- c("Day","Evening","Night","International")
+mins_avg <- c(mean(churn$Day.Minutes),mean(churn$Evening.Minutes),mean(churn$Night.Minutes),mean(churn$International.Minutes))
+calls_avg <- c(mean(churn$Day.Calls),mean(churn$Evening.Calls),mean(churn$Night.Calls),mean(churn$International.Calls))
+charges_avg <- c(mean(churn$Day.Charge),mean(churn$Evening.Charge),mean(churn$Night.Charge),mean(churn$International.Charge))
+charge_per_min_avg <- charges_avg/mins_avg
+
+eda_churn <- data.frame(ref_col,mins_avg,calls_avg,charges_avg,charge_per_min_avg)
+```
+
+```{r 4_inference_1, echo=FALSE}
+cat("The customers with international calls tend to have high churn rate but this yet to be analyzed")
+```
+
+
+```{r 4_eda_churn_graphs,fig.show='hold', out.width="33%"}
+ggplot(eda_churn, aes(x=ref_col, y=mins_avg)) + geom_bar(stat="Identity") + ggtitle("Average Minutes per Session") + xlab("Session") + ylab("Average Minutes") + theme(legend.position = "none")
+
+ggplot(eda_churn, aes(x=ref_col, y=calls_avg)) + geom_bar(stat="Identity") + ggtitle("Average Calls per Session") + xlab("Session") + ylab("Average Calls") + theme(legend.position = "none")
+
+ggplot(eda_churn, aes(x=ref_col, y=charges_avg)) + geom_bar(stat="Identity") + ggtitle("Average Charges per Session") + xlab("Session") + ylab("Average Charges") + theme(legend.position = "none")
+```
+
+```{r 4_inference_2,echo=FALSE}
+cat("The average number of call minutes and calls tend to be mostly the same regardless its Day, Evening and Night but the charges are decreasing")
+```
+
+
+```{r 4_eda_churn_graphs_2}
+ggplot(eda_churn, aes(x=reorder(ref_col,-charge_per_min_avg), y=charge_per_min_avg)) + geom_bar(stat="Identity") + ggtitle("Average Charges per Minutes per Session") + xlab("Session") + ylab("Average Charge Per Minute") + theme(legend.position = "none")
+```
+```{r 4_inference_3,echo=FALSE}
+cat("***Average charge per minute tends to be higher for the International calls, adding to the earlier assumption of the International subscribes might be switching to other networks***\nCharges per night has the least even though there is similar calls and minutes between the day, The people having day calls might churn due to the high disparity between the day and night since its a loss for the day heavy calling customers")
+```
+
+
+```{r 4_churn_1}
+histogram_plot <- function(dataset,x_axis,binwidth,title,x_axis_title){
+  ggplot(dataset, aes(x=x_axis)) + geom_histogram(binwidth = binwidth) + ggtitle(title) + xlab(x_axis_title) + ylab("Frequency") ## Distribution
+}
+
+emperical_value_cal <- function(col,col_name){
+mean <- mean(col,na.rm = TRUE) #mean of the returns
+stddev <- sd(col, na.rm = TRUE) #sd of the returns
+
+##Calculate the boundaries of all the standard deviations
+one_sd_lower   <- mean - 1*stddev
+one_sd_upper   <- mean + 1*stddev
+two_sd_lower   <- mean - 2*stddev
+two_sd_upper   <- mean + 2*stddev
+three_sd_lower <- mean - 3*stddev
+three_sd_upper <- mean + 3*stddev
+
+total_values <- length(col) - 1 #Sub 1 to remove the na value at the start
+
+# Observations within 1 SD 
+returns_within_onesd <- length(which(col >= one_sd_lower & col <= one_sd_upper))
+returns_percent_within_onesd <- 100*(returns_within_onesd/total_values)
+
+# Observations within 2 SD 
+returns_within_twosd <- length(which(col >= two_sd_lower & col <= two_sd_upper))
+returns_percent_within_twosd <- 100*(returns_within_twosd/total_values)
+
+# Observations within 3 SD 
+returns_within_threesd <- length(which(col >= three_sd_lower & col <= three_sd_upper))
+returns_percent_within_threesd <- 100*(returns_within_threesd/total_values)
+
+sprintf("The values percentages of the %s within the standard deviations are %.2f,%.2f and %.2f",col_name,returns_percent_within_onesd,returns_percent_within_twosd,returns_percent_within_threesd)
+}
+
+boxplot_func <- function(dataset,y_axis,title,y_axis_title){
+  ggplot(data = dataset, aes(y = y_axis)) + geom_boxplot(outlier.colour="red") + coord_flip() + ylab(y_axis_title) + ggtitle(title) ##Boxplot 
+}
+
+fivenumber_summary <- function(col,col_name){
+  five_sum <- fivenum(col,na.rm = TRUE)
+  
+  cat("Five Number Summary of",col_name,"\nMinimum:",five_sum[1],
+    "\nQ1:", five_sum[2],
+    "\nMedian:",five_sum[3],
+    "\nQ3:",five_sum[4],
+    "\nMaximum",five_sum[5])
+  
+}
+```
+
+# Account Length in Days Distribution
+```{r 4_churn_account_length,figures-side, fig.show='hold', out.width="50%",echo=FALSE}
+histogram_plot(dataset=churn,x_axis=churn$Account.Length,binwidth=20,title="Account Length Distribution",x_axis_title ="Account Length in Days")
+boxplot_func(dataset=churn,y_axis=churn$Account.Length,title="Account Length Distribution",y_axis_title ="Account Length in Days")
+```
+
+```{r 4_churn_account_length_emp, echo=FALSE}
+emperical_value_cal(churn$Account.Length,"Account Length in days")
+```
+
+```{r 4_churn_account_length_five, echo=FALSE}
+fivenumber_summary(churn$Account.Length,"Account Length in days")
+```
+# Voice Mail Distribution
+```{r 4_voice_mail, figures-side, fig.show='hold', out.width="50%",echo=FALSE}
+churn_voice <-filter(churn,Voice.Mail.Plan=="yes")
+histogram_plot(dataset=churn_voice,x_axis=churn_voice$Voice.Mail.Messages,binwidth=5,title="Voice Mail Messages Distribution",x_axis_title ="Voice Mail Messages")
+boxplot_func(dataset=churn_voice,y_axis=churn_voice$Voice.Mail.Messages,title="Voice Mail Messages Distribution",y_axis_title ="Voice Mail Messages ")
+```
+
+```{r 4_voice_mail_length_emp, echo=FALSE}
+emperical_value_cal(churn_voice$Voice.Mail.Messages,"Voice Mail Messages")
+```
+
+```{r 4_voice_mail_length_five, echo=FALSE}
+fivenumber_summary(churn_voice$Voice.Mail.Messages,"Voice Mail Messages")
+```
+
+# Day call minutes Distribution
+```{r 4_call_mins_length,figures-side, fig.show='hold', out.width="50%",echo=FALSE}
+histogram_plot(dataset=churn,x_axis=churn$Day.Minutes,binwidth=30,title="Call Minutes in Day Distribution",x_axis_title ="Call Minutes in Day")
+boxplot_func(dataset=churn,y_axis=churn$Day.Minutes,title="Call Minutes in Day Distribution",y_axis_title ="Call Minutes in Day")
+```
+
+```{r 4_call_mins_length_emp, echo=FALSE}
+emperical_value_cal(churn$Day.Minutes,"Call Minutes in Day")
+```
+
+```{r 4_call_mins_length_five, echo=FALSE}
+fivenumber_summary(churn$Day.Minutes,"Call Minutes in Day")
+```
+
+# Day calls Distribution
+```{r 4_calls_day_length,figures-side, fig.show='hold', out.width="50%",echo=FALSE}
+histogram_plot(dataset=churn,x_axis=churn$Day.Calls,binwidth=5,title="Calls in Day Distribution",x_axis_title ="Calls in Day")
+boxplot_func(dataset=churn,y_axis=churn$Day.Calls,title="Calls in Day Distribution",y_axis_title ="Calls in Day")
+```
+
+```{r 4_calls_day_length_emp, echo=FALSE}
+emperical_value_cal(churn$Day.Calls,"Calls in Day")
+```
+
+```{r 4_calls_day_length_five, echo=FALSE}
+fivenumber_summary(churn$Day.Calls,"Calls in Day")
+```
+
+# Day Call Charges Distribution
+```{r 4_day_charges_length,figures-side, fig.show='hold', out.width="50%",echo=FALSE}
+histogram_plot(dataset=churn,x_axis=churn$Day.Charge,binwidth=5,title="Day Call Charges Distribution",x_axis_title ="Day Call Charges")
+boxplot_func(dataset=churn,y_axis=churn$Day.Charge,title="Day Call Charges Distribution",y_axis_title ="Day Call Charges")
+```
+
+```{r 4_day_charges_length_emp, echo=FALSE}
+emperical_value_cal(churn$Day.Charge,"Day Call Charges")
+```
+
+```{r 4_day_charges_length_five, echo=FALSE}
+fivenumber_summary(churn$Day.Charge,"Day Call Charges")
+```   
+
+
+# Evening minutes Distribution
+```{r 4_evening_mins_length,figures-side, fig.show='hold', out.width="50%",echo=FALSE}
+histogram_plot(dataset=churn,x_axis=churn$Evening.Minutes,binwidth=25,title="Evening minutes Distribution",x_axis_title ="Evening minutes")
+boxplot_func(dataset=churn,y_axis=churn$Evening.Minutes,title="Evening minutes Distribution",y_axis_title ="Evening minutes")
+```
+
+```{r 4_evening_mins_length_emp, echo=FALSE}
+emperical_value_cal(churn$Evening.Minutes,"Evening minutes")
+```
+
+```{r 4_evening_mins_length_five, echo=FALSE}
+fivenumber_summary(churn$Evening.Minutes,"Evening minutes")
+```
+
+# Evening calls Distribution
+```{r 4_evening_calls_length,figures-side, fig.show='hold', out.width="50%",echo=FALSE}
+histogram_plot(dataset=churn,x_axis=churn$Evening.Calls,binwidth=10,title="Evening calls Distribution",x_axis_title ="Evening calls")
+boxplot_func(dataset=churn,y_axis=churn$Evening.Calls,title="Evening calls Distribution",y_axis_title ="Evening calls")
+```
+
+```{r 4_evening_calls_length_emp, echo=FALSE}
+emperical_value_cal(churn$Evening.Calls,"Evening calls")
+```
+
+```{r 4_evening_calls_length_five, echo=FALSE}
+fivenumber_summary(churn$Evening.Calls,"Evening calls")
+```
+
+# Evening charges Distribution
+```{r 4_evening_charges_length,figures-side, fig.show='hold', out.width="50%",echo=FALSE}
+histogram_plot(dataset=churn,x_axis=churn$Evening.Charge,binwidth=2.5,title="Evening charges Distribution",x_axis_title ="Evening charges")
+boxplot_func(dataset=churn,y_axis=churn$Evening.Charge,title="Evening charges Distribution",y_axis_title ="Evening charges")
+```
+
+```{r 4_evening_charges_length_emp, echo=FALSE}
+emperical_value_cal(churn$Evening.Charge,"Evening charges")
+```
+
+```{r 4_evening_charges_length_five, echo=FALSE}
+fivenumber_summary(churn$Evening.Charge,"Evening charges")
+```
+
+# Night Minutes Distribution
+```{r 4_night_minutes_length,figures-side, fig.show='hold', out.width="50%",echo=FALSE}
+histogram_plot(dataset=churn,x_axis=churn$Night.Minutes,binwidth=20,title="Night Minutes Distribution",x_axis_title ="Night Minutes")
+boxplot_func(dataset=churn,y_axis=churn$Night.Minutes,title="Night Minutes Distribution",y_axis_title ="Night Minutes")
+```
+
+```{r 4_night_minutes_length_emp, echo=FALSE}
+emperical_value_cal(churn$Night.Minutes,"Night Minutes")
+```
+
+```{r 4_night_minutes_length_five, echo=FALSE}
+fivenumber_summary(churn$Night.Minutes,"Night Minutes")
+```
+
+# Night calls Distribution
+```{r 4_night_calls_length,figures-side, fig.show='hold', out.width="50%",echo=FALSE}
+histogram_plot(dataset=churn,x_axis=churn$Night.Calls,binwidth=10,title="Night calls Distribution",x_axis_title ="Night calls")
+boxplot_func(dataset=churn,y_axis=churn$Night.Calls,title="Night calls Distribution",y_axis_title ="Night calls")
+```
+
+```{r 4_night_calls_length_emp, echo=FALSE}
+emperical_value_cal(churn$Night.Calls,"Night calls")
+```
+
+```{r 4_night_calls_length_five, echo=FALSE}
+fivenumber_summary(churn$Night.Calls,"Night calls")
+```
+
+
+# Night Charge Distribution
+```{r 4_night_charge_length,figures-side, fig.show='hold', out.width="50%",echo=FALSE}
+histogram_plot(dataset=churn,x_axis=churn$Night.Charge,binwidth=1.5,title="Night Charge Distribution",x_axis_title ="Night Charge")
+boxplot_func(dataset=churn,y_axis=churn$Night.Charge,title="Night Charge Distribution",y_axis_title ="Night Charge")
+```
+
+```{r 4_night_charge_length_emp, echo=FALSE}
+emperical_value_cal(churn$Night.Charge,"Night Charge")
+```
+
+```{r 4_night_charge_length_five, echo=FALSE}
+fivenumber_summary(churn$Night.Charge,"Night Charge")
+```
+
+# International Minutes Distribution
+```{r 4_int_mins_length,figures-side, fig.show='hold', out.width="50%",echo=FALSE}
+histogram_plot(dataset=filter(churn,International.Plan=="yes"),x_axis=filter(churn,International.Plan=="yes")$International.Minutes ,binwidth=2,title="International Minutes Distribution",x_axis_title ="International Minutes")
+boxplot_func(dataset=filter(churn,International.Plan=="yes"),y_axis=filter(churn,International.Plan=="yes")$International.Minutes ,title="International Minutes Distribution",y_axis_title ="International Minutes")
+```
+
+```{r 4_int_mins_length_emp, echo=FALSE}
+emperical_value_cal(filter(churn,International.Plan=="yes")$International.Minutes ,"International Minutes")
+```
+
+```{r 4_int_mins_length_five, echo=FALSE}
+fivenumber_summary(filter(churn,International.Plan=="yes")$International.Minutes ,"International Minutes")
+```
+
+# International calls Distribution
+```{r 4_int_calls_length,figures-side, fig.show='hold', out.width="50%",echo=FALSE}
+histogram_plot(dataset=filter(churn,International.Plan=="yes"),x_axis=filter(churn,International.Plan=="yes")$International.Calls ,binwidth=1,title="International calls Distribution",x_axis_title ="International calls")
+boxplot_func(dataset=filter(churn,International.Plan=="yes"),y_axis=filter(churn,International.Plan=="yes")$International.Calls ,title="International calls Distribution",y_axis_title ="International calls")
+```
+
+```{r 4_int_calls_length_emp, echo=FALSE}
+emperical_value_cal(filter(churn,International.Plan=="yes")$International.Calls ,"International calls")
+```
+
+```{r 4_int_calls_length_five, echo=FALSE}
+fivenumber_summary(filter(churn,International.Plan=="yes")$International.Calls ,"International calls")
+```
+
+# International charges Distribution
+```{r 4_int_charges_length,figures-side, fig.show='hold', out.width="50%",echo=FALSE}
+histogram_plot(dataset=filter(churn,International.Plan=="yes"),x_axis=filter(churn,International.Plan=="yes")$International.Charge ,binwidth=0.5,title="International charges Distribution",x_axis_title ="International charges")
+boxplot_func(dataset=filter(churn,International.Plan=="yes"),y_axis=filter(churn,International.Plan=="yes")$International.Charge ,title="International charges Distribution",y_axis_title ="International charges")
+```
+
+```{r 4_int_charges_length_emp, echo=FALSE}
+emperical_value_cal(filter(churn,International.Plan=="yes")$International.Charge ,"International charges")
+```
+
+```{r 4_int_charges_length_five, echo=FALSE}
+fivenumber_summary(filter(churn,International.Plan=="yes")$International.Charge ,"International charges")
+```
+
+```{r churn_distribution_inference,echo=FALSE}
+cat("Distributions of all the numerical variables are in Normal distributions\nFrom the emperical values we can further confirm that the values are in normal distribution and we can do further analysis such as Hypothesis testing for proving any cases and develop any models")
+```
+
+
+# Customer Service Calls Distribution
+```{r 4_cust_ser_length,figures-side, fig.show='hold', out.width="50%",echo=FALSE}
+histogram_plot(dataset=churn,x_axis=churn$Customer.Service.Calls  ,binwidth=1,title="Customer Service Calls Distribution",x_axis_title ="Customer Service Calls")
+boxplot_func(dataset=churn,y_axis=churn$Customer.Service.Calls  ,title="Customer Service Calls Distribution",y_axis_title ="Customer Service Calls")
+```
+
+```{r 4_cust_ser_length_emp, echo=FALSE}
+emperical_value_cal(churn$Customer.Service.Calls  ,"Customer Service Calls")
+```
+
+```{r 4_cust_ser_length_five, echo=FALSE}
+fivenumber_summary(churn$Customer.Service.Calls  ,"Customer Service Calls")
+```
+```{r 4_cust_ser_inference}
+cat("The customer service calls is not in Normal distributions, this might play crucial factor in deciding the customer churning")
+```
+
+
+# Relation between the Variables 
+
+```{r 4_b_heatmap}
+
+churn_corr <- subset(churn,select= -c(Customer,Voice.Mail.Plan,International.Plan,Churn.))
+churn_corr <- round(cor(churn_corr),3)
+churn_melt <- melt(churn_corr)
+
+churn_heatmap <- ggplot(churn_melt, aes(Var1, Var2)) + geom_tile(aes(fill = value)) + scale_fill_gradient(low="white", high="grey") + theme(axis.text.x = element_text(angle = 75, vjust = 1, hjust=1))
+churn_heatmap    
+```
+```{r relation_analysis, echo=FALSE}
+cat("The calls, minutes, and charges variables with in the session (i.e. day, evening and night) are highly correlated but with the other sessions its not significant, so we can use either of the variables in the session or give equal weightage while developing churn model")
+```
+
+
+# Account Length Wise Churning
+```{r 4_c_churn_eda, figures-side, fig.show='hold', out.width="33%"}
+ggplot(churn, aes(x=Churn.,y=Account.Length)) + geom_boxplot(outlier.colour="red") + labs(title="Account Length wise Churning",x="Churning",y="Account Length in Days")
+
+ggplot(churn, aes(x=Churn.,y=Customer.Service.Calls)) + geom_boxplot(outlier.colour="red") + labs(title="Customer Service Calls wise Churning",x="Churning",y="Customer Service calls in Churning")
+
+ggplot(filter(churn,Voice.Mail.Plan=='yes'), aes(x=filter(churn,Voice.Mail.Plan=='yes')$Churn.,y=filter(churn,Voice.Mail.Plan=='yes')$Account.Length)) + geom_boxplot(outlier.colour="red") + labs(title="Voice Mail wise Churning",x="Churning",y="Voice Mail")
+```
+```{r customer_churn_box_plots_analysis, echo=FALSE}
+cat("***Higher the customer service calls the higher the churn customer are, we might need to further look into the number of calls the customers are making***")
+```
+
+
+```{r charge_per_min_churn}
+churn$chargepermin_day <- churn$Day.Charge/churn$Day.Minutes
+churn$chargepermin_eve <- churn$Evening.Charge/churn$Evening.Minutes
+churn$chargepermin_night <- churn$Night.Charge/churn$Night.Minutes
+churn$chargepermin_int <- churn$International.Charge/churn$International.Minutes
+```
+
+# Effect of Day calls in Churning
+```{r 4_c_churn_eda_day, figures-side, fig.show='hold', out.width="25%"}
+
+ggplot(churn, aes(x=Churn.,y=Day.Minutes)) + geom_boxplot(outlier.colour="red") + labs(title="Days calls for Churning",x="Churning",y="Day call Minutes")  
+ggplot(churn, aes(x=Churn.,y=Day.Calls)) + geom_boxplot(outlier.colour="red") + labs(title="Days calls for Churning",x="Churning",y="Day calls") 
+ggplot(churn, aes(x=Churn.,y=Day.Charge)) + geom_boxplot(outlier.colour="red") + labs(title="Days calls for Churning",x="Churning",y="Day Charges") 
+ggplot(churn, aes(x=Churn.,y=chargepermin_day)) + geom_boxplot(outlier.colour="red") + labs(title="Days calls for Churning",x="Churning",y="Day Charges") 
+
+```
+
+
+# Effect of Evening calls in Churning
+```{r 4_c_churn_eda_evening, figures-side, fig.show='hold', out.width="25%"}
+
+ggplot(churn, aes(x=Churn.,y=Evening.Minutes)) + geom_boxplot(outlier.colour="red") + labs(title="Evening calls for Churning",x="Churning",y="Evening call Minutes")  
+ggplot(churn, aes(x=Churn.,y=Evening.Calls)) + geom_boxplot(outlier.colour="red") + labs(title="Evening calls for Churning",x="Churning",y="Evening calls") 
+ggplot(churn, aes(x=Churn.,y=Evening.Charge)) + geom_boxplot(outlier.colour="red") + labs(title="Evening calls for Churning",x="Churning",y="Evening Charges") 
+ggplot(churn, aes(x=Churn.,y=chargepermin_eve)) + geom_boxplot(outlier.colour="red") + labs(title="Evening calls for Churning",x="Churning",y="Evening Charges") 
+```
+
+# Effect of Night calls in Churning
+```{r 4_c_churn_eda_night, figures-side, fig.show='hold', out.width="25%"}
+
+ggplot(churn, aes(x=Churn.,y=Night.Minutes)) + geom_boxplot(outlier.colour="red") + labs(title="Night calls for Churning",x="Churning",y="Night call Minutes")  
+ggplot(churn, aes(x=Churn.,y=Night.Calls)) + geom_boxplot(outlier.colour="red") + labs(title="Night calls for Churning",x="Churning",y="Night calls") 
+ggplot(churn, aes(x=Churn.,y=Night.Charge)) + geom_boxplot(outlier.colour="red") + labs(title="Night calls for Churning",x="Churning",y="Night Charges") 
+ggplot(churn, aes(x=Churn.,y=chargepermin_night)) + geom_boxplot(outlier.colour="red") + labs(title="Night calls for Churning",x="Churning",y="Night Charges") 
+```
+
+# Effect of International calls in Churning
+```{r 4_c_churn_eda_int, figures-side, fig.show='hold', out.width="25%"}
+
+ggplot(filter(churn,International.Plan=="yes"), aes(x=Churn.,y=International.Minutes)) + geom_boxplot(outlier.colour="red") + labs(title="International calls for Churning",x="Churning",y="International call Minutes")  
+ggplot(filter(churn,International.Plan=="yes"), aes(x=Churn.,y=International.Calls)) + geom_boxplot(outlier.colour="red") + labs(title="International calls for Churning",x="Churning",y="International calls") 
+ggplot(filter(churn,International.Plan=="yes"), aes(x=Churn.,y=International.Charge)) + geom_boxplot(outlier.colour="red") + labs(title="International calls for Churning",x="Churning",y="International Charges") 
+ggplot(filter(churn,International.Plan=="yes"), aes(x=Churn.,y=chargepermin_int)) + geom_boxplot(outlier.colour="red") + labs(title="International calls for Churning",x="Churning",y="International Charges") 
+```
+
+```{r internation_calls_effect,echo=FALSE}
+cat("The higher the call charges for the customer, the customer chances of churning is increasing")
+```
+
+# Recommendations for avoiding the Customers Churn
+
+```{r question_5_recom,echo=FALSE}
+cat("1. We need to analyze the type of Customer service calls we are receiving since the high number of calls we receive the higher the probability for the churning\n2. Need to evaluate if the customers are getting their problems solved\n3. We might need to look into reducing the international call charges for the customers or provide specific plans and discounts for the international calls opted in service\n4. We might need to look into the charges disparity between the day, evening and nights, this might influence the customers who tend to have high number of calls between a certain of the 24-hour period")
+```
+
+
+
+```{r 5_setup, echo=FALSE}
+cat("Given: A semicondutor firm wants to decide between two projects depending upon their Net present values which is depended upon the present cash flows and sales\nTo do: Determine which investment is better")
+
+```
+
+```{r 5_initiation}
+#Creating vectors from the chart
+npv_expand <- c(40,15,-20)
+prob_vector_expand <- c(0.5,0.25,0.25)
+
+npv_enter <- c(140,15,-35)
+prob_vector_enter <- c(0.2,0.5,0.3)
+
+#Create dataframe for easy access
+prob_dist <- data.frame(npv_expand,prob_vector_expand,npv_enter,prob_vector_enter)
+colnames(prob_dist) <- c("npv_expand", "prob_expand","npv_enter","prob_enter")
+prob_dist
+
+```
+
+
+```{r 5_a}
+#Discrete Probability Distribution expected value
+expected_expand_npv <- round(sum(prob_dist$npv_expand*prob_dist$prob_expand), digits = 3)
+expected_expand_npv
+```
+
+```{r 5_a_result, echo=FALSE}
+cat("The expected net present value of expanding semiconductor business project is",expected_expand_npv)
+```
+
+```{r 5_b}
+#Variance and Standard Deviation for the expected NPV 
+expand_npv_var <- round(sum(((prob_dist$npv_expand - expected_expand_npv)^2) * prob_dist$prob_expand), digits = 3)
+expand_npv_stddev <- round(sqrt(expand_npv_var), digits = 3)
+
+```
+
+```{r 5_b_result, echo=FALSE}
+cat("The expected net present value variance and standard deviation of expanding semiconductor business project is",expand_npv_var,"and",expand_npv_stddev,"respectively")
+```
+
+```{r 5_c}
+expected_enter_npv <- round(sum(prob_dist$npv_enter*prob_dist$prob_enter), digits = 3)
+```
+
+```{r 5_c_result, echo=FALSE}
+cat("The expected net present value of entering home computer market is",expected_enter_npv)
+```
+
+```{r 5_d}
+enter_npv_var <- round(sum(((prob_dist$npv_enter- expected_enter_npv)^2) * prob_dist$prob_enter), digits = 3)
+enter_npv_stddev <- round(sqrt(enter_npv_var), digits = 3)
+```
+
+```{r 5_d_result, echo=FALSE}
+cat("The expected net present value variance and standard deviation of entering home computer market is",enter_npv_var,"and",enter_npv_stddev,"respectively")
+```
+
+```{r 5_e, echo=FALSE}
+cat("The investment on entering home computer market (25) has the highest net present value than expanding the semi-conductor business project (18.75")
+```
+
+
+```{r 5_f, echo=FALSE}
+sprintf("Expanding the semi-conductor business project with mean and standard deviation of %.2f and %.2f is less riskier than the project for Entering home computer market of %.2f mean and %.2f standard deviation. The conclusion is based on comparing the standard deviations in comparison with the means", expected_expand_npv, expand_npv_stddev, expected_enter_npv, enter_npv_stddev)
+
+```
+
+```{r 5_g}
+cov_expand <- (expand_npv_stddev/expected_expand_npv)*100
+cov_enter <- (enter_npv_stddev/expected_enter_npv)*100
+```
+
+```{r 5_g_result}
+sprintf("The expanding semi-conductor business project has coefficient of variation of %.2f and entering home computer market of %.2f suggesting that the earlier inference is correct which is investment in expanding semi-conductor business project is much riskier",cov_enter,cov_expand)
+
+```
+
+```{r 6_setup, echo=FALSE}
+cat("Given: A new office machine costs $7500 and every time a repair call costs $500. The probability of fixing the machine is 0.27 and the maximum amount to be considered for the repair costs be $2000\nTo Do:-Probability model for the number of visits, Expected Number of Service Technicials and Expected Amount spent on this machine")
+```
+
+
+```{r 6_a, echo=FALSE}
+cat("The techinician can visit maximum of 4 times after that we will exhaust the given amount.\nFollowing is the chances of occurrences in each visit:\n Visit 1: Technician repairs the machine on the first instance (0.27)\n Visit 2: First technician fails (0.73) and second technician repairs the machines (0.27)\n Visit 3: First technician fails (0.73) and Second Technician fails (0.73) and Third Technician Success (0.27)\n Visit 4: First, Second and Third Technicians fails (0.73*0.73*0.73), Fourth technician successfully repairs the (0.27)")
+```
+
+
+```{r 6_a_2}
+### 
+visit_prob <- c(0.27, 0.73*0.27,0.73*0.73*0.27,(0.73*0.73*0.73*0.27)+(0.73*0.73*0.73*0.73)) ###Based upon above probabilities the measures have created
+visit_costs <- c(500,1000,1500,2000) #The costs of the visits of the technicians
+visit_technicias <- c(1,2,3,4) # Number of technicians after each visit
+
+visit_dist <- data.frame(visit_prob, visit_costs, visit_technicias)
+```
+
+```{r 6_a_3, figures-side, fig.show='hold', out.width="50%"}
+
+kable(visit_dist, format = "markdown")
+
+ggplot(visit_dist, aes(x=visit_technicias, y=visit_prob)) +
+  geom_line() +geom_point() + labs(x="Visits",y="Probability distribution")
+```
+
+
+```{r 6_b}
+expected_number_technicians <- round(sum(visit_dist$visit_technicias*visit_dist$visit_prob), digits = 3)
+```
+
+```{r 6_b_result, echo=FALSE}
+cat("The expected number of service technicians that will be called is",expected_number_technicians)
+
+```
+
+```{r 6_c,echo=FALSE}
+cat("In continuation to the above question we need to consider the case for the buying new machine when all the technicians failed to repair the machine")
+```
+
+
+```{r 6_c_2}
+visit_prob_c <- c(0.27, 0.73*0.27,0.73*0.73*0.27,0.73*0.73*0.73*0.27,0.73*0.73*0.73*0.73) ###Based upon above probabilities the measures have created
+visit_costs_c <- c(500,1000,1500,2000,9500) #The costs of the visits of the technicians ##9500 is for the 7500 and 2000 costs he need to go through after all the 4 trials were unsuccessful
+
+expected_number_of_sales <- round(sum(visit_prob_c*visit_costs_c), digits = 3)
+```
+
+
+```{r 6_c_result, echo=FALSE}
+cat("The expected amount spent on this machine is",expected_number_of_sales)
+```
+
+
+
+```{r 7_setup, echo=FALSE}
+cat("Given:A fitness center trying to convert the attendees into club membership. The probability for that conversion is 0.4 and there is total of 20 attendees\nTo Do: The given follows the binomoial distribution as it only has the chances of accepting or rejecting the club membership")
+
+```
+
+
+
+```{r}
+dbinom(x=10, size = 20, prob = 0.4)
+```
+
+
+```{r 7_a, echo=FALSE}
+sprintf("The probability that exactly 10 of the attendees will purchase a club membership is %.3f.", dbinom(x=10, size = 20, prob = 0.4))
+```
+
+
+```{r}
+pbinom(10, size = 20, prob = 0.4, lower.tail = TRUE)
+```
+
+
+```{r 7_b, echo=FALSE}
+
+sprintf("The probability that no more than 10 of the attendees will purchase a club membership is %.3f.", pbinom(10, size = 20, prob = 0.4, lower.tail = TRUE))
+```
+
+```{r}
+pbinom(15, size = 20, prob = 0.4, lower.tail = FALSE)
+```
+
+```{r 7_c, echo=FALSE}
+sprintf("The probability that at least 15 of the attendees will purchase a club membership is %.6f.", pbinom(15, size = 20, prob = 0.4, lower.tail = FALSE))
+```
+
+```{r 8_setup, echo=FALSE}
+cat("Given:Airline passengers rights, health, and safety supports the customers by calling them. The average calls per day (16hour period) is 400")
+
+```
+
+
+```{r 8_a}
+avg_calls_day <- 400
+avg_calls_per_hour <- avg_calls_day/16
+avg_calls_per_30mins <- avg_calls_per_hour/2
+avg_calls_per_15mins <- avg_calls_per_30mins/2
+```
+
+```{r 8_a_result, echo=FALSE}
+sprintf("The average number of calls in one-hour interval is %.2f.",avg_calls_per_hour)
+sprintf("The average number of calls per 30 min interval is %.2f.",avg_calls_per_30mins)
+sprintf("The average number of calls per 15 min interval is %.2f.",avg_calls_per_15mins)
+```
+
+```{r 8_b}
+prob_8_b <- dpois(6, lambda = avg_calls_per_15mins)
+```
+
+```{r 8_b_result,echo=FALSE}
+sprintf("The probability of exactly six calls in a 15-minute interval is %.4f.",prob_8_b)
+```
+
+
+```{r 8_c}
+prob_8_c <- dpois(0, lambda = avg_calls_per_15mins)
+```
+
+```{r 8_c_result,echo=FALSE}
+sprintf("The probability of no calls in a 15-minute interval is %.4f.",prob_8_c)
+```
+
+```{r 8_d}
+prob_8_d <- ppois(2, lambda = avg_calls_per_15mins, lower.tail = FALSE)
+```
+
+```{r 8_d_result,echo=FALSE}
+sprintf("The probability of at least two calls in a 15-minute interval is %.6f.",prob_8_d)
+```
+
+
+```{r 9_setup, echo=FALSE}
+cat("Given: Total population in the lot is 1000 and sample taken is 50 for lot acceptance or rejection. The condition for acceptance is 4 or fewer defectives in the sample\nTo Do: Find the probability of the acceptance for the given defective rates")
+```
+```{r 9_background, echo=FALSE}
+
+cat("Assumption: As we are having sample size of only 50 out of 1000 i.e. 5% sample size we can use either binomial or hypergeometric. The reason for that is even considering the no replacement condition for the binomial, the probability picking the same chip again and again is low (0.001)")
+```
+
+
+
+```{r 9_1_1}
+##Binomial Distribution
+
+cat("Binomial Distribution: The sample size is 50, x axis value is 45 since the number of non-defective items to be picked up should be between (46-50), the probability calculation depends upon the defective fraction given for example 0.01 is the defective fraction then there is 0.99 chance of picking up all the non-defective items, assuming the random sampling while picking up the items. The lower tail has to be false since I need to pick up the non-defective items from 46 to 50")
+
+lot_size <- 1000 #Total Lot Size
+sample_size <- 50 #Sample Size
+def_fra <- c(0.02,0.04,0.06,0.08,0.1,0.12,0.14,0.16,0.18) #Given defective fractions
+func_range <- 1:length(def_fra)
+acceptance_lot_1 <- 50-5
+
+binom_prob_acceptance <- c()
+for(def in func_range){
+  binom_prob_acceptance[def] <- pbinom(acceptance_lot_1,sample_size,(1-def_fra[def]),lower.tail = FALSE)
+}
+
+binom_acceptance_prob_1 <- data.frame(def_fra, binom_prob_acceptance)
+
+ggplot(binom_acceptance_prob_1, aes(x=def_fra, y=binom_prob_acceptance)) + geom_bar(stat="Identity") + ggtitle("Acceptance Probability over defective fractions") + xlab("Defective Fractions") + ylab("Probability of Lot Acceptance") + theme(legend.position = "none")
+
+```
+```{r binom_analogy, echo=FALSE}
+cat("While the defective fractions are increasing the probability for accepting the lots is decreasing that matches with the general norm i.e. no of defective chips are increasing the lot so picking a defective one becomes better")
+```
+
+```{r binom_2nd}
+acceptance_lot_2 <- 50-6 #The lineance to get one more defective wrong while picking up increasing the value
+
+binom_prob_acceptance_2 <- c()
+for(def in func_range){
+  binom_prob_acceptance_2[def] <- pbinom(acceptance_lot_2,sample_size,(1-def_fra[def]),lower.tail = FALSE)
+}
+
+binom_acceptance_prob_2 <- data.frame(def_fra, binom_prob_acceptance_2)
+
+ggplot(binom_acceptance_prob_2, aes(x=def_fra, y=binom_prob_acceptance_2)) + geom_bar(stat="Identity") + ggtitle("Acceptance Probability over defective fractions") + xlab("Defective Fractions") + ylab("Probability of Lot Acceptance") + theme(legend.position = "none")
+```
+```{r 9_binom_final, echo=FALSE}
+cat("While we increased the acceptance range of number of defectives in a lot from 4 to 5, the acceptance probabilites of the lots has increased as expected")
+```
+
+
+
+```{r 9_1}
+
+
+def_size <- def_fra*lot_size #defective lot
+non_def_size <- (1-def_fra)*lot_size #non defective lot
+
+##Function To calculate the probability of each defective level
+prob_9_1_func <- function(def){
+                              ((choose(non_def_size[def],sample_size) * choose(def_size[def],0)) + (choose(non_def_size[def],sample_size-1) * choose(def_size[def],1)) +     (choose(non_def_size[def],sample_size-2) * choose(def_size[def],2)) + (choose(non_def_size[def],sample_size-3) * choose(def_size[def],3)) + (choose(non_def_size[def],sample_size-4) * choose(def_size[def],4)))/ choose(lot_size,sample_size)
+}
+
+
+
+prob_acceptance <- c()
+for(def in func_range){
+  prob_acceptance[def] <- prob_9_1_func(def)
+}
+
+acceptance_prob <- data.frame(def_fra, prob_acceptance)
+
+ggplot(acceptance_prob, aes(x=def_fra, y=prob_acceptance)) + geom_bar(stat="Identity") + ggtitle("Acceptance Probability over defective fractions") + xlab("Defective Fractions") + ylab("Probability of Lot Acceptance") + theme(legend.position = "none")
+```
+
+
+```{r 9_2}
+prob_9_1_func_2 <- function(def){
+                              ((choose(non_def_size[def],sample_size) * choose(def_size[def],0)) + (choose(non_def_size[def],sample_size-1) * choose(def_size[def],1)) +     (choose(non_def_size[def],sample_size-2) * choose(def_size[def],2)) + (choose(non_def_size[def],sample_size-3) * choose(def_size[def],3)) + (choose(non_def_size[def],sample_size-4) * choose(def_size[def],4)) + (choose(non_def_size[def],sample_size-5) * choose(def_size[def],5)))/ choose(lot_size,sample_size)
+}
+
+
+prob_acceptance_2 <- c()
+for(def in func_range){
+  prob_acceptance_2[def] <- prob_9_1_func_2(def)
+}
+
+acceptance_prob_2 <- data.frame(def_fra, prob_acceptance_2)
+
+
+ggplot(acceptance_prob_2, aes(x=def_fra, y=prob_acceptance_2)) + geom_bar(stat="Identity") + ggtitle("Acceptance Probability over defective fractions") + xlab("Defective Fractions") + ylab("Probability of Lot Acceptance") + theme(legend.position = "none")
+```
+
+
+
+```{r 10, echo=FALSE}
+cat("Given:Madison store stocks five air conditioners units a week, the probabilities for the customer demand is also provided")
+```
+
+
+```{r 10_a}
+units_demanded <- c(0,1,2,3,4,5,6,7,8,9) #Demand Units
+prob_demanded <- c(0.05,0.05,0.08,0.16,0.30,0.16,0.1,0.05,0.05,0) #Probability of the demands
+units_left <- c(5,4,3,2,1,0,0,0,0,0) #Stock Left
+stocks_order <- c(0,0,0,0,0,0,1,2,3,4) #Stocks ordered
+
+madison <- data.frame(units_demanded,prob_demanded,units_left,stocks_order)
+
+madison_unitsleft <- madison %>% group_by(units_left) %>% summarize(prob_dist = sum(prob_demanded))
+madison_stocksorder <- madison %>% group_by(stocks_order) %>% summarize(prob_dist = sum(prob_demanded))
+```
+
+```{r 10_a_plots, figures-side, fig.show='hold', out.width="50%"}
+ggplot(madison_unitsleft, aes(x=units_left, y=prob_dist)) + geom_bar(stat="Identity") + ggtitle("Units left probability distribution") + xlab("Units left") + ylab("Probability of Distribution") + theme(legend.position = "none")
+
+ggplot(madison_stocksorder, aes(x=stocks_order, y=prob_dist)) + geom_bar(stat="Identity") + ggtitle("Stock Order probability distribution") + xlab("Stock Order") + ylab("Probability of Distribution") + theme(legend.position = "none")
+
+```
+
+
+```{r 10.b}
+units_left_expected_value <- round(sum(madison_unitsleft$units_left*madison_unitsleft$prob_dist), digits = 3)
+stock_order_expected_value <- round(sum(madison_stocksorder$stocks_order*madison_stocksorder$prob_dist), digits = 3)
+```
+
+```{r 10_b_result,echo=FALSE}
+sprintf("The expected value of units left and the expected value of stocks order are %.3f. and %.3f.",units_left_expected_value,stock_order_expected_value)
+```
+
+
+```{r 10_c}
+profits <- c(60*0,60*1,60*2,60*3,60*4,60*5,((60*5) - (20*1)),((60*5) - (20*2)),((60*5) - (20*3)),((60*5) - (20*4))) #Profits based on number of units left
+profits
+
+madison <- cbind(madison, data.frame(profits = profits))
+madison
+madison[c('profits','prob_demanded')]
+```
+
+
+```{r 10_d}
+expected_profits <- round(sum(madison$prob_demanded*madison$profits), digits = 3)
+```
+
+```{r 10_d_result,echo=FALSE}
+sprintf("The expected value of profit is %.3f.",expected_profits)
+```

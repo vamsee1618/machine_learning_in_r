@@ -1,0 +1,1050 @@
+---
+title: "Homework-4"
+author: "Vamsee Krishna Reddy Narahari"
+date: "2022-12-03"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+options(warn=-1) ##Ignoring the warnings
+knitr::opts_chunk$set(echo = TRUE)
+#load required libraries
+list.of.packages <- c("ggplot2", "readr","dplyr","psych","data.table","knitr","kableExtra","tidyverse","lubridate","gmodels","gridExtra","reshape2")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
+
+library("readr")
+library("dplyr")
+library("psych")
+library("ggplot2")
+library("data.table")
+library("knitr")
+library("kableExtra")
+library("tidyverse")
+library("lubridate")
+library("gmodels")
+library("gridExtra")
+library("reshape2")
+library("stats")
+library("PASWR2")
+library("janitor")
+library("nortest")
+library("car")
+```
+
+```{r question_1_read_data}
+df_automobile <- read.csv("Automobile Service Center Ratings.csv")
+head(df_automobile,2)
+```
+
+## Question 1.a
+
+```{r question1_objectives,echo=FALSE}
+cat("Objective: To check if the customers who are returning rating the questions higher than who are not\nType of Data: Ordinal\nTypes of Sample: Independent\nDefinition: People who are returning as sample 1 and who are not as sample 2")
+```
+**Hypothesis:**<br />
+<br>$H_{o}$ : The two population locations are the same <br />
+<br>$H_{1}$ : The location of population 1 is to the right of the location of population 2
+
+
+```{r question1_wilcoxin_test}
+df_automobile$Return<-factor(df_automobile$Return,levels=c(2,1))
+wilcox.test(as.integer(df_automobile$Quality) ~ as.factor(df_automobile$Return),alt='greater',paired = FALSE, exact = FALSE, conf.level=0.95)
+```
+```{r question1_wilcoxin_inter,echo=FALSE}
+cat("Interpretation: The data provides sufficient evidence to infer that the customers who are returning rating the quality question higher than who are not")
+```
+```{r question1_note,echo=FALSE}
+cat("The Objective and other steps would be almost similar to the ones mentioned above for the remaining questions")
+```
+
+```{r que1_fairness}
+wilcox.test(as.integer(df_automobile$Fairness) ~ as.factor(df_automobile$Return),alt='greater',paired = FALSE, exact = FALSE, conf.level=0.95)
+```
+```{r question1_wilcoxin_fair,echo=FALSE}
+cat("Interpretation: The data provides sufficient evidence to infer that the customers who are returning rating the Fairness question higher than who are not")
+```
+
+```{r que1_guarantee}
+wilcox.test(as.integer(df_automobile$Guarantee) ~ as.factor(df_automobile$Return),alt='greater',paired = FALSE, exact = FALSE, conf.level=0.95)
+```
+
+```{r question1_wilcoxin_guaranteeee,echo=FALSE}
+cat("Interpretation: Since the p-value is greater than 0.5, we would not be able to reject the Null hypothesis")
+```
+
+```{r que1_checkout}
+wilcox.test(as.integer(df_automobile$Checkout) ~ as.factor(df_automobile$Return),alt='greater',paired = FALSE, exact = FALSE, conf.level=0.95)
+```
+
+```{r question1_wilcoxin_guarantee,echo=FALSE}
+cat("Interpretation: The data provides sufficient evidence to infer that the customers who are returning rating the Checkout question higher than who are not")
+```
+
+## Question 1.b
+
+```{r question1b,echo=FALSE}
+cat("Objective: To check if the customers rating of the questions differ based on their comment sentiment\nType of Data: Ordinal\nTypes of Sample: Independent\nDefinition: Denote Positive Comment - Population 1, No comment - Population 2, Negative Comment - Population 3")
+```
+**Hypothesis:**<br />
+<br>$H_{o}$ : The locations of all three populations are the same. <br />
+<br>$H_{1}$ : At least two population locations differ.
+
+```{r qual_que2}
+df_automobile$Comment<-factor(df_automobile$Comment,levels=c(1,3,2))
+kruskal.test(as.integer(df_automobile$Quality) ~ as.factor(df_automobile$Comment))
+```
+
+```{r qual_infer_que2,echo=FALSE}
+cat("The P-value is less than 0.05 significance level, so we decide to reject the null hypothesis and infer that the ratings differe for atleast two of the comment categories")
+```
+
+```{r fair_que2}
+kruskal.test(as.integer(df_automobile$Fairness) ~ as.factor(df_automobile$Comment))
+```
+
+```{r fair_infer_que2,echo=FALSE}
+cat("The P-value is greater than 0.05 significance level, so we decide not to reject the null hypothesis")
+```
+
+```{r guar_que2}
+kruskal.test(as.integer(df_automobile$Guarantee) ~ as.factor(df_automobile$Comment))
+```
+
+```{r guar_infer_que2,echo=FALSE}
+cat("The P-value is greater than 0.05 significance level, so we decide not to reject the null hypothesis")
+```
+
+```{r check_que2}
+kruskal.test(as.integer(df_automobile$Checkout) ~ as.factor(df_automobile$Comment))
+```
+
+```{r check_infer_que2,echo=FALSE}
+cat("The P-value is less than 0.05 significance level, so we decide to reject the null hypothesis and infer that the ratings differ for atleast two of the comment categories")
+```
+
+# Question-2 
+```{r que2_load_data}
+df_drink <- read.csv("Soft Drink Recipe.csv")
+head(df_drink,2)
+```
+
+```{r que2_objccc,echo=FALSE}
+cat("Objective: To check if the people rating the three drinks differently\nType of Data: Ordinal\nTypes of Sample: Blocked Design\nDefinition:Denote Original Population 1, New Recipe 1- Population-2, New Recipe 2- Population-3")
+```
+**Hypothesis:**<br />
+<br>$H_{o}$ : The locations of all three populations are the same. <br />
+<br>$H_{1}$ : At least two population locations differ.
+
+```{r}
+df_drink_stack <- melt(df_drink, id.vars="Person")
+names(df_drink_stack) <- c("Person","Recipe","Rating")
+df_drink_stack$Recipe <- factor(df_drink_stack$Recipe, level = c("Original","New.Recipe.1","New.Recipe..2"))
+```
+```{r}
+friedman.test(df_drink_stack$Rating, as.factor(df_drink_stack$Recipe),as.factor(df_drink_stack$Person))
+```
+
+```{r,echo=FALSE}
+cat("Interpretation: As p-value less than 0.05, we can reject the null hypothesis and say that there is significant difference between atleast two recipes")
+```
+
+```{r}
+library(PMCMRplus)
+PMCMRplus::frdAllPairsNemenyiTest(df_drink_stack$Rating, as.factor(df_drink_stack$Recipe),as.factor(df_drink_stack$Person))
+```
+## Question-3
+```{r}
+que3_data <- read.csv("Job Loss.csv")
+head(que3_data,2)
+```
+
+```{r que2_objc,echo=FALSE}
+cat("Objective: To analyze for any relation between job loss probability and number of hours\nType of Data: Interval and Ordinal")
+```
+**Hypothesis:**<br />
+<br>$H_{o}$ : $\rho_{s}$ = 0 <br />
+<br>$H_{1}$ : $\rho_{s}$ $>$ 0.
+
+```{r}
+cor.test(x=que3_data$HRS1,y=(que3_data$JOBLOSE),method = "spearman",alternative='greater')
+```
+
+```{r,echo=FALSE}
+cat("As the p-value less than the 0.05 significance, we can reject the null hypothesis and conclude that the job loss chances and work hours are related, also we can say that the if longer hours worked, your job loss is less likely")
+```
+## Question-4
+```{r}
+df_ice <- read.csv("Ice Cream Comparison.csv")
+head(df_ice,2)
+```
+
+```{r,echo=FALSE}
+cat("Objective: To check if the people prefering European brand even though icecream is same\nType of Data: Ordinal\nTypes of Sample: Blocked Design\nDefinition:Denote European Population 1, Domestic - Population-2")
+```
+**Hypothesis:**<br />
+<br>$H_{o}$ : The two population locations are the same <br />
+<br>$H_{1}$ : The location of the population 1 is right to the population 2
+
+```{r}
+SIGN.test(x = df_ice$European, y=df_ice$Domestic, alternative="greater",conf.level = 0.95)
+```
+
+```{r,echo=FALSE}
+cat("As the p-value less than the significance value, we would be rejecting the Null Hypothesis and infer that the People have brand preference and in this case the customers prefer european bran")
+```
+
+## Question-5
+```{r}
+df_time <- read.csv("Machine Selection.csv")
+head(df_time,2)
+```
+
+```{r,echo=FALSE,fig.show= 'hold', out.width= "33%"}
+hist(df_time$Machine.1)
+hist(df_time$Machine.2)
+hist(df_time$Machine.1-df_time$Machine.2)
+```
+
+```{r,echo=FALSE}
+cat("From the above histogram data, we can see that the time differences are not normal in both the category situation. We can work on Wilcoxin Sign Rank Sum test in this case")
+```
+
+```{r}
+df_time_stack <- melt(df_time, id.vars="Key")
+names(df_time_stack) <- c("Key","Machine","Time")
+```
+```{r,echo=FALSE}
+cat("Objective: Compare the two machine cutting times\nType of Data: Interval\nTypes of Sample: Blocked Design\nDefinition:Machine 1 -Population 1, Machine 2 - Population 2")
+```
+**Hypothesis:**<br />
+<br>$H_{o}$ : The two population locations are the same <br />
+<br>$H_{1}$ : The two populations are different
+
+```{r}
+wilcox.test(df_time_stack$Time~df_time_stack$Machine,alt="two.sided",paired=TRUE,exact=FALSE,conf.level = 0.95)
+```
+
+```{r,echo=FALSE}
+cat("At 5% significance, we will reject the null hypothesis and infer that the two cutting machines are  different and the locksmith can buy the fastest version")
+```
+
+## Question-6
+```{r}
+df_cred <- read.csv("CreditCardHolders.csv")
+head(df_cred,2)
+```
+
+```{r,echo=FALSE,fig.show= 'hold', out.width= "33%"}
+hist(df_cred$Applied)
+hist(df_cred$Contacted)
+hist(df_cred$Applied-df_cred$Contacted)
+```
+```{r}
+shapiro.test(df_cred$Contacted)
+shapiro.test(df_cred$Applied)
+shapiro.test(df_cred$Applied-df_cred$Contacted)
+```
+
+
+```{r,echo=FALSE}
+cat("We can observe normality in the data from the graphs and normality tests, so we can infer that the normality exists")
+```
+
+```{r}
+var.test(df_cred$Applied,df_cred$Contacted)
+```
+```{r,echo=FALSE}
+cat("From the variance test, we can infer that the variances of the two samples are not equal")
+```
+
+
+```{r,echo=FALSE}
+cat("Objective: Compare the purchases of the two ways customers are coming in\nType of Data: Interval\nTypes of Sample: Independent samples\nDefinition:Directly Applied -Population 1, Via Email/Telemarketing - Population 2")
+```
+
+**Hypothesis:**<br />
+<br>$H_{o}$ : $\mu{1}$ $=$ $\mu{2}$  <br />
+<br>$H_{1}$ : $\mu{1}$ $\neq$ $\mu{2}$
+
+```{r}
+t.test(df_cred$Applied,df_cred$Contacted,
+       var.equal = F,
+       mu = 0,
+       alternative = "t")
+```
+
+```{r,echo=FALSE}
+cat("As the p-value is greater than 0.05, we cannot reject the null hypothesis and there is no statistically significant evidence that the two purchase populations are different")
+```
+
+## Question-7
+
+```{r}
+df_debt <- read.csv("AmericanDebt.csv")
+head(df_debt,2)
+```
+
+```{r,echo=FALSE,fig.show= 'hold', out.width= "33%"}
+hist(df_debt$This.Year)
+hist(df_debt$Last.Year)
+hist( df_debt$This.Year-df_debt$Last.Year)
+```
+```{r}
+qqnorm(df_debt$This.Year-df_debt$Last.Year, pch = 1, frame = FALSE)
+qqline(df_debt$This.Year-df_debt$Last.Year, col = "steelblue", lwd = 2)
+```
+
+
+
+```{r}
+shapiro.test(df_debt$This.Year)
+shapiro.test(df_debt$Last.Year)
+shapiro.test(df_debt$This.Year-df_debt$Last.Year)
+```
+
+
+```{r,echo=FALSE}
+cat("We can observe normality in the data from the graphs and normality tests, so we can infer that the normality exists")
+```
+
+```{r}
+var.test(df_debt$This.Year,df_debt$Last.Year)
+```
+
+```{r,echo=FALSE}
+cat("Objective: Compare the debts of last and this year \nType of Data: Interval\nTypes of Sample: Independent samples\nDefinition:This Year -Population 1, last year - Population 2")
+```
+
+**Hypothesis:**<br />
+<br>$H_{o}$ : $\mu{1}$ $=$ $\mu{2}$  <br />
+<br>$H_{1}$ : $\mu{1}$ $\neq$ $\mu{2}$
+
+```{r}
+var.test(df_debt$This.Year,df_debt$Last.Year)
+```
+
+
+```{r}
+t.test(df_debt$This.Year,df_debt$Last.Year,
+       var.equal = F, paired = TRUE,
+       mu = 0,
+       alternative = "greater")
+```
+
+```{r,echo=FALSE}
+cat("As the p-value greater than 0.05, we cannot reject our null hypothesis and infer that there is no statistical evidence that this year Americans are in more debt than last year")
+```
+
+# Question-8
+
+```{r}
+df_ben <- read.csv("Benefits Comparison.csv")
+head(df_ben,2)
+```
+# 8.a
+```{r,echo=FALSE}
+cat("Some of cofounding variables would be:\n1. People on the different geographies might have different preferences.\n2. Environment, work culture, and health costs variation between the two extreme coasts might influence the employee preferences.\nThese might cause influence their decision in turn applying the same policy to entire company might not be right decision")
+```
+# 8.b
+```{r,echo=FALSE}
+cat("Objective: To determine if the health benefits causing higher retention\nLevel of Measurement: Nominal\nExperiment: Independent\nDefinition: ")
+```
+
+**Hypothesis:**<br />
+<br>$H_{o}$ : $P_{1}$ $-$ $P_{2}$ = 0.05 <br/>
+<br>$H_{1}$ : $P_{1}$ $-$ $P_{2}$ > 0.05
+
+```{r}
+df_ben %>% group_by(Benefit) %>% summarise(count = n(),
+                                                 retained = sum(Retention))
+```
+
+
+```{r}
+p1 <- 107/125
+p2 <- 109/140
+n1 <- 125
+n2 <- 140
+C <- 0.05
+SE = sqrt((p1*(1-p1)/n1 + p2*(1-p2)/n2))
+z = ((p1 - p2) - C)/SE
+1 - pnorm(abs(z))
+```
+
+```{r,echo=FALSE}
+cat("As the p-value greater than any significance vlaue, we won't be reject the null hypothesis and we can't say that health benefits is better in providing the better employee retention")
+```
+
+# 8.c
+**Hypothesis:**<br />
+<br>$H_{o}$ : $P_{1}$ $-$ $P_{2}$ = 0 <br/>
+<br>$H_{1}$ : $P_{1}$ $-$ $P_{2}$ $\neq$ 0
+
+
+```{r}
+prop.test(x= c(107,109),n=c(125,140),alternative = "two.sided",correct = F)
+```
+```{r,echo=FALSE}
+cat("As the p-value is greater than 0.05, we failed to reject the null hypothesis and infer that there is no significant difference between the two benefits on the retention")
+```
+
+# Question-9
+
+```{r}
+df_wage <- read.csv("Wage.csv")
+head(df_wage,2)
+```
+
+```{r}
+wage <- lm(df_wage$Wage ~ df_wage$Educ + df_wage$Exper)
+summary(wage)
+```
+```{r}
+wage_resid <- abs(wage$residuals)
+```
+
+```{r}
+cor.test(wage_resid,df_wage$Educ,
+         alternative = 'greater',
+         method = "spearman", 
+         exact = FALSE)
+```
+```{r}
+cor.test(wage_resid,df_wage$Exper,
+         alternative = 'greater',
+         method = "spearman", 
+         exact = FALSE)
+```
+
+
+```{r,echo=FALSE}
+cat("As the p-value for both the tests less than 0.05, we reject the null hypothesis and infer there is sign of heteroscedasticity due to both the experience and education level variables")
+```
+
+
+## Question-10
+```{r}
+df_comp <- read.csv("Compensation.csv")
+df_comp <- df_comp %>%  row_to_names(row_number = 1)
+head(df_comp,2)
+```
+```{r}
+df_comp_avg <- tail(df_comp, n = 3)
+df_comp_avg <- data.frame(t(df_comp_avg) %>% row_to_names(row_number = 1))
+colnames(df_comp_avg) <- c("Average_Compensation","Std_Dev","Average_Productivity")
+df_comp_avg$Average_Compensation <- as.numeric(df_comp_avg$Average_Compensation)
+df_comp_avg$Average_Productivity <- as.numeric(df_comp_avg$Average_Productivity)
+```
+
+```{r}
+com_prod <- lm(df_comp_avg$Average_Compensation~df_comp_avg$Average_Productivity)
+summary(com_prod)
+```
+# Question 10.a
+```{r}
+com_pro_res_10a <- com_prod$residuals
+```
+
+# Question 10.b 
+```{r}
+com_pro_res <- log(com_prod$residuals^2)
+```
+
+```{r}
+model_log_10b <- lm(com_pro_res ~ log(df_comp_avg$Average_Productivity))
+summary(model_log_10b)
+```
+
+```{r,echo=FALSE}
+cat("As the p-value greater than the 0.05, we failed to reject the null hypothesis. So, we can conclude that there is no heteroscadesticity")
+```
+
+# Question 10.c 
+```{r}
+comp_resd_10c <- abs(com_prod$residuals)
+```
+
+```{r}
+model_log_10c_1 <- lm(comp_resd_10c ~ (df_comp_avg$Average_Productivity))
+summary(model_log_10c_1)
+```
+
+```{r}
+model_log_10c <- lm(comp_resd_10c ~ sqrt(df_comp_avg$Average_Productivity))
+summary(model_log_10c)
+```
+```{r,echo=FALSE}
+cat("As the p-value greater than the 0.05, we failed to reject the null hypothesis. So, we can conclude that there is no heteroscadesticity")
+```
+
+# Question 10.D
+```{r}
+cor.test(comp_resd_10c,df_comp_avg$Average_Productivity,
+         alternative = 't',
+         method = "spearman", 
+         exact = FALSE)
+```
+```{r,echo=FALSE}
+cat("As the p-value greater than the 0.05, we failed to reject the null hypothesis. So, we can conclude that there is no heteroscadesticity")
+```
+
+## Question-11
+```{r}
+df_rd <- read.csv("R&D.csv")
+head(df_rd,2)
+```
+
+```{r}
+rd_sales <- lm(df_rd$RD ~ df_rd$SALES)
+summary(rd_sales)
+```
+## Park test
+```{r}
+resid_rd <- log(rd_sales$residuals^2)
+
+summary(lm(resid_rd ~ log(df_rd$SALES)))
+```
+```{r,echo=FALSE}
+cat("As the p-value greater than 0.05, we failed to reject the null hypothesis and infer that the there is no heteroscadesticity")
+```
+
+## Glejser test
+```{r}
+res_gle <- abs(rd_sales$residuals)
+
+summary(lm(res_gle ~ (df_rd$SALES)))
+summary(lm(res_gle ~ sqrt(df_rd$SALES)))
+
+summary(lm(res_gle ~ I(1/df_rd$SALES)))
+summary(lm(res_gle ~ I(1/sqrt(df_rd$SALES))))
+```
+```{r,echo=FALSE}
+cat("From the above p-values, we can determine that there is heteroscadesticity")
+```
+
+## White's test
+```{r}
+res_whi <- (rd_sales$residuals)^2
+
+summary(lm(res_whi ~ df_rd$SALES + I(df_rd$SALES^2)))
+
+```
+```{r}
+chisq_val = (0.2896)*nrow(df_rd)
+
+pchisq(chisq_val,df =2 ,lower.tail = FALSE)
+```
+
+
+
+
+```{r,echo=FALSE}
+cat("As the p-value greater than the 0.05 significance value, we failed to reject the null hypothesis and suggest that there is no heteroscadesticity")
+```
+
+
+## QUestion-12
+```{r}
+df_foc <- read.csv("FOC.csv")
+head(df_foc,2)
+```
+
+```{r}
+sales_foc <- lm(df_foc$SALES~df_foc$TIME)
+summary(sales_foc)
+```
+```{r}
+plot(df_foc$TIME,sales_foc$residuals)
+```
+
+```{r,echo=FALSE}
+cat("The scatterplot between residuals and x-variable showcasing patterns suggesting there migh be heteroscadesticity")
+```
+
+
+```{r}
+resid_sq <- (sales_foc$residuals)^2
+
+model_sum <- summary(lm(resid_sq~ df_foc$TIME +I(df_foc$TIME^2)))
+
+chisq_val = model_sum$r.squared*nrow(df_foc)
+
+pchisq(chisq_val,df = 2,lower.tail = FALSE)
+```
+```{r,echo=FALSE}
+cat("As the p-value less than the 0.05 significance value, we can reject the null hypothesis and infer that there is high heteroscadesticity")
+```
+
+```{r}
+model_12_2 <- lm(log(SALES)~TIME,df_foc)
+summary(model_12_2)
+```
+```{r}
+plot(df_foc$TIME,model_12_2$residuals)
+```
+```{r,echo=FALSE}
+cat("In the scatterplot, there is no significant pattern, we can assume that the heteroscadesticity has been reduced")
+```
+
+```{r}
+resid_sq_2 <- (model_12_2$residuals)^2
+
+model_sum_2 <- summary(lm(resid_sq_2~ df_foc$TIME +I(df_foc$TIME^2)))
+
+chisq_val_2 = model_sum_2$r.squared*nrow(df_foc)
+
+pchisq(chisq_val_2,df = 2,lower.tail = FALSE)
+```
+```{r,echo=FALSE}
+cat("As the P-value suggests a statistically high signicant evidence for the presence of heteroscedasticity but it is less significant than earlier")
+```
+
+```{r}
+exp(predict(model_12_2,data.frame(TIME= 300)))
+```
+```{r,echo=FALSE}
+cat("The prediction for 300th week is 31301.4")
+```
+
+
+## Question-13
+```{r}
+df_woody <- read.csv("Woody.csv")
+head(df_woody,2)
+```
+
+```{r}
+woody <- lm(Y ~ N + P + I, data = df_woody)
+  
+summary(woody)
+```
+$H_{0} : \alpha_{1} = \alpha_{2} = 0$
+
+$H_{1}$ : At least one alpha is not equal to zero
+
+```{r}
+resid_sq <- (woody$residuals)^2
+
+aux_bre <- summary(lm(resid_sq ~ df_woody$N + df_woody$P + df_woody$I))
+
+chisq_val = aux_bre$r.squared*nrow(df_woody)
+
+pchisq(chisq_val,df = 3,lower.tail = FALSE)
+```
+
+```{r,echo=FALSE}
+cat("As the p-value greater than 0.05, we fail reject the null hypothesis, suggesting that there is no statistically significant evidence for signs of Heteroscedasticity")
+```
+
+```{r}
+lmtest::bptest(woody)
+
+```
+```{r,echo=FALSE}
+cat("The P-values from bptest is same as the calculations")
+```
+
+
+```{r}
+woody_white <- summary(lm(resid_sq ~ N + P + I + I(N^2) + I(P^2) + I(I^2) + N*P+ P*I + N*I + N*P*I,df_woody ))
+
+chisq_val = woody_white$r.squared*nrow(df_woody)
+
+pchisq(chisq_val,df = 10,lower.tail = FALSE)
+```
+```{r, echo=FALSE}
+cat("The P-value suggests that there is no statistically signicant evidence for the presence of heteroscedasticity")
+```
+
+```{r}
+model_ko <- lm(resid_sq ~ I(woody$fitted.values^2))
+summary(model_ko)
+```
+```{r,echo=FALSE}
+cat("Koenker-Bassett test is inline with the other tests, since its p-value greater than the significance value suggesting that there is no heteroscadesiticity")
+```
+
+
+# Question-14
+```{r}
+df_eco <- read.csv("EconomistSalary.csv")
+```
+
+```{r}
+df_eco$Age <- c(22,27,32,37,42,47,52,57,62,67,70)
+df_eco$Salary <- as.numeric(gsub(',',"",df_eco$Median.salary....))
+```
+
+```{r}
+plot((df_eco$Age),(df_eco$Salary))
+```
+
+
+
+```{r}
+sal_age <- lm(Salary ~ Age, data = df_eco)
+
+summary(sal_age)
+```
+```{r}
+plot((df_eco$Age),sal_age$residuals)
+```
+
+
+```{r}
+cat("From both the residual plot and normal (y~x) plot we can see that the salary are trending with the age and decreasing after some point, there is a clear trend with respective to the age.")
+```
+
+# Question 14.b
+```{r}
+y_14b <- (df_eco$Salary/sqrt(df_eco$Age)) 
+x1 <- 1/sqrt(df_eco$Age)
+x2 <- sqrt(df_eco$Age)
+model_prop_x <- lm(y_14b ~ 0 + x1+ x2)
+summary(model_prop_x)
+```
+# Question 14.c
+```{r}
+y_14c <- (df_eco$Salary/(df_eco$Age)) 
+x1_c <- 1/(df_eco$Age)
+model_prop_x_sq <- lm(y_14c ~ x1_c)
+summary(model_prop_x_sq)
+```
+## Question- 14.D
+```{r,fig.show= 'hold', out.width= "50%"}
+plot(model_prop_x$residuals~model_prop_x$fitted.values)
+plot(model_prop_x_sq$residuals~model_prop_x_sq$fitted.values)
+```
+```{r,echo=FALSE}
+cat("From the scatter plots between the residuals and respective Y's we can clearly there is a pattern between the Residuals and Ys. We need to conduct formal tests to confirm the same")
+```
+
+```{r}
+summary(lm(log(sal_age$residuals^2)~log(df_eco$Age)))
+summary(lm(log(model_prop_x$residuals^2) ~ log(x1)))
+summary(lm(log(model_prop_x$residuals^2) ~ log(x2)))
+summary(lm(log(model_prop_x_sq$residuals^2) ~ log(x1_c)))
+```
+```{r,echo=FALSE}
+cat("As the p-values are greater than any significant value, we failed to reject the null hypothesis and there is no statistically significant evidence that Heteroscedasticity exists in the WLS functional forms. But in the residual plots there is still a systematic pattern, so in this case it might be possible that there is heteroscedasticity but it wasn't captured by the tests.")
+```
+## Question-15
+```{r}
+df_ski <- read.csv("SkiSales.csv")
+head(df_ski,2)
+```
+
+```{r}
+model_tick <- lm(Tickets~Snowfall + Temperature, df_ski)
+summary(model_tick)
+```
+# Normality test
+```{r}
+hist(model_tick$residuals,breaks=8)
+```
+```{r}
+shapiro.test(model_tick$residuals)
+```
+```{r}
+cat("As the p-value greater than the significance value, we can suggest that the residuals are normal in distribution")
+```
+
+# Independence test - Autocorrelation
+```{r}
+plot(model_tick$fitted.values , model_tick$residuals)
+```
+
+```{r}
+lmtest::dwtest(model_tick)
+```
+```{r,echo=FALSE}
+cat("As p-value less than the significant value, we can state that there is autocorrelation")
+```
+
+# Constant Variance Test - Heteroscadesticity
+
+```{r,fig.show= 'hold', out.width= "50%"}
+plot(model_tick$residuals~df_ski$Snowfall)
+plot(model_tick$residuals~df_ski$Temperature)
+```
+
+
+
+```{r,echo=FALSE}
+cat("Due to small number of data points and not to lose any more df, conducting the Modified White's  test")
+```
+
+```{r}
+model_tick_resid <- model_tick$residuals^2
+model_tick_fitted_val_sq <- model_tick$fitted.values^2
+summary(lm(model_tick_resid ~ model_tick$fitted.values + model_tick_fitted_val_sq))
+```
+```{r,echo=FALSE}
+cat("As p-value greater than the significance value, we can suggest there is no heteroscadesticity")
+```
+
+```{r}
+df_ski$trend <- 1:nrow(df_ski)
+```
+```{r}
+model_tick_trend <- lm(Tickets~Snowfall + Temperature + trend, df_ski)
+summary(model_tick_trend)
+```
+# Test for autocorrelation
+```{r}
+
+plot(model_tick_trend$fitted.values , model_tick_trend$residuals)
+```
+```{r,echo=FALSE}
+lmtest::dwtest(model_tick_trend)
+```
+
+```{r,echo=FALSE}
+cat("After introducing the trend variable, we can clearly see that there is no autocorrelation")
+```
+
+## Question-16
+```{r}
+df_cp <- read.csv("CompensationAndProductivity.csv")
+head(df_cp,2)
+```
+
+```{r}
+model16_1 <- lm(Y~X,df_cp)
+summary(model16_1)
+```
+```{r}
+plot(df_cp$Year,model16_1$residuals)
+```
+
+```{r}
+lmtest::dwtest(model16_1)
+```
+```{r,echo=FALSE}
+cat("From the scatter plot and durbin watson test, we can conclude that there is evidence of Positive Autocorrelation")
+```
+
+```{r}
+df_cp$trend <- 1:nrow(df_cp)
+model16_2 <- lm(Y ~ X + trend,df_cp)
+summary(model16_2)
+```
+```{r}
+lmtest::dwtest(model16_2)
+```
+```{r,echo=FALSE}
+cat("No change in autocorrelation by including the trend variable in the model")
+```
+
+```{r}
+df_cp$lagy <- lag(df_cp$Y,1)
+```
+```{r}
+model16_3 <- lm(Y ~ X + lagy, df_cp)
+
+summary(model16_3)
+```
+```{r,echo=FALSE}
+cat("The overmodel is significantly valid and even the lag term of Y is significant in explaining the variance of the Y. So, we can state the lag term is a missing varible as the Adj-R2 increasing as well.")
+```
+
+```{r}
+d = lmtest::dwtest(model16_3)
+rho = 1-(d$statistic/2)
+var_lag <- 0.05826^2
+
+h_stat <- (rho*sqrt(nrow(df_cp)/(1-nrow(df_cp)*var_lag)))
+h_stat
+```
+```{r,echo=FALSE}
+cat("Since the h_stat is greater than the 1.96, we can reject the null hypothesis and state that there is first-order autocorrelation.\n Due to the presence of the first order autocorrelation including a trend variable didn't help to solve the issue.")
+```
+
+## Question-17
+```{r}
+df_diet <- read.csv("DietEffect.csv")
+head(df_diet,2)
+```
+
+```{r,fig.show= 'hold', out.width= "50%"}
+df_diet_s <- subset(df_diet, Diet. ==1)
+df_diet_n <- subset(df_diet, Diet. ==2)
+hist(df_diet_s$Time)
+hist(df_diet_n$Time)
+```
+
+```{r,fig.show= 'hold', out.width= "50%"}
+qqnorm(df_diet_s$Time, pch = 1, frame = FALSE)
+qqline(df_diet_s$Time, col = "steelblue", lwd = 2)
+
+qqnorm(df_diet_n$Time, pch = 1, frame = FALSE)
+qqline(df_diet_n$Time, col = "steelblue", lwd = 2)
+```
+
+
+```{r}
+shapiro.test(df_diet_s$Time)
+shapiro.test(df_diet_n$Time)
+```
+```{r,echo=FALSE}
+cat("From the above normality test we can infer that the times are normal.")
+```
+
+```{r}
+var.test(df_diet_s$Time,df_diet_n$Time)
+```
+```{r,echo=FALSE}
+cat("Two variances are equal")
+```
+
+
+**Hypothesis:**<br />
+<br>$H_{o}$ : $\mu_{1}$ - $\mu_{2}$ = 0 <br />
+<br>$H_{1}$ : $\mu_{1}$ - $\mu_{2}$ < 0
+
+```{r}
+t.test(df_diet_s$Time,df_diet_n$Time,
+       var.equal = T,
+       mu = 0,
+       alternative = 'l')
+```
+
+```{r,echo=FALSE}
+cat("As the p-value is greater than the significance value, we failed to reject the null hypothesis and suggest that the dieting has no adverse impact on the time to solve problems")
+```
+
+
+**Hypothesis:**<br />
+<br>$H_{o}$ : Dieting and answering the questions are independent <br />
+<br>$H_{1}$ : Dieting and answering the questions are dependent 
+
+```{r}
+chisq.test(df_diet$Diet.,df_diet$Letters)
+chisq.test(df_diet$Diet.,df_diet$Letters, correct=FALSE)
+```
+```{r,echo=FALSE}
+cat("At 0.05 significance level, we can reject the null hypothesis that dieting and answering the questions are dependent.But the p-value is almost near to 0.05 so, it would be critical to consider other experiments to answer on whole issue and with Yates continuity correction the variables are dependent.")
+```
+
+
+
+```{r}
+chisq.test(df_diet$Diet.,df_diet$Words)
+chisq.test(df_diet$Diet.,df_diet$Words, correct=FALSE)
+``` 
+```{r}
+cat("Note: Chi-square has been done with and without Yates continuinty based on the discussion with Professor")
+```
+
+
+```{r,echo=FALSE}
+cat("At 0.05 significance level, we failed to reject the null hypothesis that dieting and answering the questions are independent. So, we dont need to study if the dieting has adverse effect.")
+```
+
+```{r,echo=FALSE}
+cat("So, finally we can conclude there is no statistical evidence that the dieting has affect on brain")
+```
+
+## Question-18
+
+
+```{r}
+df_cons <- read.csv("Consumption.csv")
+head(df_cons,2)
+```
+
+#18.a
+```{r}
+model18_1 <- lm(con ~ dpi + aaa, df_cons)
+summary(model18_1)
+```
+# 18.b
+```{r}
+df_cons$time <- 1:nrow(df_cons)
+plot(df_cons$time,model18_1$residuals)
+```
+```{r,echo=FALSE}
+cat("The scatterplot doesn't seem to be entirely a random. It contains some systematic pattern maybe caused by the lag factors or external factors")
+```
+
+#18.c
+
+**Hypothesis:**<br />
+<br>$H_{o}$ :  No evidence of positive autocorrelation <br />
+<br>$H_{1}$ :  Evidence of positive autocorrelation
+
+```{r}
+lmtest::dwtest(model18_1)
+```
+```{r,echo=FALSE}
+cat("As p-vlaue is less than the 0.05 significance, we can reject the null hypothesis and infer that there is positive autocorrelation")
+```
+
+
+# 18.d
+
+
+```{r}
+resid_lag <- lag(model18_1$residuals,1)
+summary(lm(model18_1$residuals ~ df_cons$dpi + df_cons$aaa + resid_lag))
+```
+```{r}
+chisq <- (nrow(df_cons) - 3)*(0.6477)
+pchisq(chisq,df =3,lower.tail = FALSE)
+```
+```{r,echo=FALSE}
+cat("The lagrange-multipier test also suggesting the same thing as Durbin-Watson that the autocorrelation exists")
+```
+
+# 18.e 
+```{r}
+n <- nrow(df_cons)
+d <- 0.38577
+k <- 3
+rho_hat <- (n^2*(1-d/2)+k^2)/(n^2 - k^2)
+```
+
+```{r}
+y_lag <-  lag(df_cons$con, 1)
+aaa_lag <-  lag(df_cons$aaa, 1)
+dpi_lag <-  lag(df_cons$dpi,1)
+
+y_final <- df_cons$con - rho_hat*y_lag
+aaa_final <- df_cons$aaa - rho_hat*aaa_lag
+dpi_final <- df_cons$dpi - rho_hat*dpi_lag
+
+y_final[1] <- df_cons$con[1]*sqrt(1-rho_hat^2)
+aaa_final[1] <- df_cons$aaa[1]*sqrt(1-rho_hat^2)
+dpi_final[1] <- df_cons$dpi[1]*sqrt(1-rho_hat^2)
+```
+
+
+```{r}
+model_gls <- lm(y_final ~ aaa_final + dpi_final)
+summary(model_gls)
+```
+```{r,echo=FALSE}
+cat("For both the models, the coefficients are different except for slope coefficent for dpi. However, aaa has a different coefficient. The process of removing the autocorrelation is making the coefficients different. And intercept follows the beta_0 *(1-rho) property.")
+```
+
+```{r}
+lmtest::dwtest(model_gls)
+```
+```{r,echo=FALSE}
+cat("The GLS model doesn't have the autocorrelation from the durbin-watson test")
+```
+
+# 18.G
+```{r}
+sandwich::NeweyWest(model18_1)
+
+summary(model18_1)
+
+lmtest::coeftest(model18_1,vcov = sandwich::NeweyWest(model18_1))
+```
+# 18.H
+```{r,echo=FALSE}
+cat("After applying NeweyWest method, the coefficients are same as the OLS output. The standard errors are adjusted for  Auto-correlation")
+```
+

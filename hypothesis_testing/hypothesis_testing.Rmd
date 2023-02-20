@@ -1,0 +1,548 @@
+---
+title: "BAX-400 Homework 3"
+subtitle: "Summer 2022 Section 2"
+author:
+- Vamsee Krishna Reddy Narahari
+output: html_document
+date: '2022-09-11'
+---
+
+```{r setup, include=FALSE}
+options(warn=-1) ##Ignoring the warnings
+knitr::opts_chunk$set(echo = TRUE)
+#load required libraries
+list.of.packages <- c("ggplot2", "readr","dplyr","psych","data.table","knitr","kableExtra","tidyverse","lubridate","gmodels","gridExtra","reshape2")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
+
+library("readr")
+library("dplyr")
+library("psych")
+library("ggplot2")
+library("data.table")
+library("knitr")
+library("kableExtra")
+library("tidyverse")
+library("lubridate")
+library("gmodels")
+library("gridExtra")
+library("reshape2")
+```
+
+## Question 1
+```{r question_1_provided, echo=FALSE}
+cat("Given: IRS and CRA wants to determine the easy filling tax form between the current and three newly developed taxforms\nTo do: Conduct ANOVA test to determine if the time taken to fill out the different form is significantly different")
+```
+```{r question_1_typeofdesign, echo=FALSE}
+cat("Completely Randomized Design has been followed for this experimentation")
+```
+
+```{r question_1_load_dataset}
+irs_1 <- read.csv("IRS 1.csv") ##Load the dataset
+irs_st_1 <- stack(irs_1) ## stack the dataset
+colnames(irs_st_1) <- c("fill_time","form_type")
+head(irs_st_1,1)
+```
+
+```{r question_1_summary}
+summary(irs_1)
+```
+# 1.a
+```{r question_1a_norm, echo=FALSE}
+cat("Checking the normality by plotting the histograms for each form type")
+```
+
+
+```{r question_1a_informal, figures-side, fig.show="hold", out.width="25%"}
+ggplot(irs_1, aes(x=Form.1)) + geom_histogram(binwidth = 40) + ggtitle("Form 1 Sample Distribution") + xlab("Form 1") + ylab("Frequency")
+
+ggplot(irs_1, aes(x=Form.2)) + geom_histogram(binwidth = 40) + ggtitle("Form 1 Sample Distribution") + xlab("Form 2") + ylab("Frequency")
+
+ggplot(irs_1, aes(x=Form.3)) + geom_histogram(binwidth = 40) + ggtitle("Form 1 Sample Distribution") + xlab("Form 3") + ylab("Frequency")
+
+ggplot(irs_1, aes(x=Form.4)) + geom_histogram(binwidth = 40) + ggtitle("Form 1 Sample Distribution") + xlab("Form 4") + ylab("Frequency")
+```
+
+
+```{r question_1a_residuals_why, echo=FALSE}
+cat("As the sample size is low and since no clear pattern from histogram, we can test our normality and constant variances conditions on the residuals and statistical tests")
+```
+
+
+```{r question_1a_reisduals}
+lm_irs_1 <- lm(irs_st_1$fill_time ~ irs_st_1$form_type)
+
+irs_1_resids <- residuals(lm_irs_1) ## Reisduals
+irs_1_preds <- predict(lm_irs_1) ## Predictions
+```
+
+```{r question_1a_residual_plots, figures-side, fig.show="hold", out.width="50%", echo=FALSE}
+### Normality test: Histogram
+hist(irs_1_resids, main="Residuals of the fill time vs form type linear model",xlab = "Residuals")
+
+### Normality test: Normal Quantile Plot
+qqnorm(irs_1_resids,main="Residuals of the fill time vs form type linear model")
+qqline(irs_1_resids)
+```
+
+```{r question_1a_stat_test}
+irs_and_dr <- nortest::ad.test(irs_1_resids) ## Anderson Darling Test
+```
+
+```{r question_1a_result_summary,echo=FALSE}
+cat(sprintf("As the p-value (%.3f) from Anderson Darling Test to check normality is greater than our significance value, we failed to reject the null hypothesis i.e. data is sampled from the normally distributed population.\nMoreover the Q-Q plots and histogram plots of the residuals suggest the same",irs_and_dr$p.value))
+```
+
+# 1.b 
+```{r question_1b_initial_context,echo=FALSE}
+cat("To check variances among the different form types filling times")
+```
+
+
+```{r question_1b_initial, figures-side, fig.show="hold", out.width="50%", echo=FALSE}
+ggplot(irs_st_1, aes(x=form_type,y=fill_time)) + geom_boxplot(outlier.colour="red") + labs(title="Fill time for all form types",x="Forms",y="Fill Time") 
+
+plot(irs_1_preds, irs_1_resids,main="Residuals of the fill time vs form type linear model")
+```
+
+```{r question_1b_stat_test}
+irs_1_levens <- car::leveneTest(irs_st_1$fill_time ~ irs_st_1$form_type)
+irs_1_levens$`Pr(>F)`[1]
+```
+
+```{r question_1b_summary_results,echo=FALSE}
+cat(sprintf("As the p-value (%.3f) from Levenes Test to check variance constant condition is greater than our significance value, we failed to reject the null hypothesis i.e. there is constant variance among the groups\nMoreover the boxplots suggest not a big difference in variances among the different form type fill times",irs_1_levens$`Pr(>F)`[1]))
+```
+
+
+# 1.c
+
+**Hypothesis:**<br />
+<br>$H_{o}$ : $\mu_{1}$ $=$ $\mu_{2}$ $=$ $\mu_{3}$ $=$ $\mu_{4}$<br />
+<br>$H_{1}$ : Atleast one mean is different
+
+```{r question_1c_hypothesis,echo=FALSE}
+cat("Null Hypothesis: Form fill times across the 4 different form types is same\nAlternate Hypothesis: Atleas 1 form fill time is different from the others")
+```
+
+```{r question_1c_anova}
+anova_irs_1 <- aov(irs_st_1$fill_time ~ irs_st_1$form_type)
+summary(anova_irs_1)
+```
+
+```{r question_1c_anova_inf,echo=FALSE}
+cat("Since the p-value (0.036) is less than our significance value (0.05), we can reject our null hypothesis and conclude that the mean fill times of atleast 1 form type is different from one of the other form types")
+```
+# 1.d
+```{r question_1d_tukey}
+tukey_irs_ques_1 <- TukeyHSD(anova_irs_1)
+tukey_irs_ques_1
+```
+
+```{r question_1d_tukey_plot}
+plot(tukey_irs_ques_1,las=1)
+```
+
+```{r question_1d_result,echo=FALSE}
+cat("The fill times for the Form 4 and Form 1 are different, also Form 1 working better than the Form 4 so they can implement the Form 1 version as the tax return form")
+```
+
+## Question 2
+```{r question_2_given, echo=FALSE}
+cat("Given: All the 4 form types are tried by each and every member in the 30 person group\nTo do: Conduct ANOVA test to determine if the time taken to fill out the form is significantly different under block design")
+```
+```{r question_2_typeofdesign, echo=FALSE}
+cat("Randomised Block Design has been followed for this experimentation")
+```
+
+```{r question_2_load_dataset}
+irs_2 <- read.csv("IRS 2.csv") ##Load the dataset
+irs_2$Taxpayer <- factor(irs_2$Taxpayer)
+irs_st_2 <- cbind(irs_2[1], stack(irs_2[2:5])) ##stack the dataset
+
+colnames(irs_st_2) <- c("tax_payer","fill_times","form_type")
+```
+
+```{r question_2_summary}
+summary(irs_2)
+```
+
+
+# 2.a
+```{r question_2a_norm, echo=FALSE}
+cat("Checking the normality by plotting the histograms for each form type")
+```
+
+
+```{r question_2a_informal, figures-side, fig.show="hold", out.width="25%"}
+ggplot(irs_2, aes(x=Form.1)) + geom_histogram(binwidth = 40) + ggtitle("Form 1 Sample Distribution") + xlab("Form 1") + ylab("Frequency")
+
+ggplot(irs_2, aes(x=Form.2)) + geom_histogram(binwidth = 40) + ggtitle("Form 1 Sample Distribution") + xlab("Form 2") + ylab("Frequency")
+
+ggplot(irs_2, aes(x=Form.3)) + geom_histogram(binwidth = 40) + ggtitle("Form 1 Sample Distribution") + xlab("Form 3") + ylab("Frequency")
+
+ggplot(irs_2, aes(x=Form.4)) + geom_histogram(binwidth = 40) + ggtitle("Form 1 Sample Distribution") + xlab("Form 4") + ylab("Frequency")
+```
+
+
+```{r question_2a_residuals_why, echo=FALSE}
+cat("As the sample size is low and since no clear pattern from histogram, we can test our normality and constant variances conditions on the residuals and statistical tests")
+```
+
+
+```{r question_2a_reisduals}
+lm_irs_2 <- lm(irs_st_2$fill_time ~ irs_st_2$form_type + irs_st_2$tax_payer)
+
+irs_2_resids <- residuals(lm_irs_2) ## Reisduals
+irs_2_preds <- predict(lm_irs_2) ## Predictions
+```
+
+```{r question_2a_residual_plots, figures-side, fig.show="hold", out.width="50%", echo=FALSE}
+### Normality test: Histogram
+hist(irs_2_resids)
+
+### Normality test: Normal Quantile Plot
+qqnorm(irs_2_resids)
+qqline(irs_2_resids)
+```
+
+```{r question_2a_stat_test}
+irs_and_dr_2 <- nortest::ad.test(irs_2_resids) ## Anderson Darling Test
+irs_and_dr_2
+```
+
+```{r question_2a_result_summary,echo=FALSE}
+cat(sprintf("As the p-value (%.3f) from Anderson Darling Test to check normality is lesser than our significance value, we can reject the null hypothesis i.e. data is may not be sampled from the normally distributed population\n But the Q-Q plots and histogram plots of the residuals are bit contradicting to our test so we can assume the normality as stated in the question as well",irs_and_dr_2$p.value))
+```
+# 2.b 
+```{r question_2b_initial_context,echo=FALSE}
+cat("Variances among the form type filling times")
+```
+
+
+```{r question_2b_initial, figures-side, fig.show="hold", out.width="50%", echo=FALSE}
+ggplot(irs_st_2, aes(x=form_type,y=fill_times)) + geom_boxplot(outlier.colour="red") + labs(title="Fill time for all form types",x="Forms",y="Fill Time") 
+
+plot(irs_2_preds, irs_2_resids,main="Linear Model Residuals for the Fillins times vs Form Type and Tax Payer")
+```
+
+```{r question_2b_stat_test}
+irs_2_fligner <- fligner.test(irs_st_2$fill_time ~ irs_st_2$form_type)
+irs_2_fligner$p.value
+```
+
+```{r question_2b_summary_results,echo=FALSE}
+cat(sprintf("As the p-value (%.3f) from Fligner Test to check variance constant condition is greater than our significance value, we failed to reject the null hypothesis i.e. there is constant variance among the groups \nMoreover the boxplots suggest not a big difference in variances among the different form type fill times",irs_2_fligner$p.value))
+```
+# 2.c
+
+**Hypothesis:**<br />
+<br>$H_{o}$ : $\mu_{1}$ $=$ $\mu_{2}$ $=$ $\mu_{3}$ $=$ $\mu_{4}$<br />
+<br>$H_{1}$ : Atleast one mean is different
+
+```{r question_2c_hypothesis, echo=FALSE}
+cat("Null Hypothesis: Form fill times across the 4 different forms is same\nAlternate Hypothesis: Atleast 1 form fill time is different from the others")
+```
+
+```{r question_2c_anova}
+anova_irs_2 <- aov(irs_st_2$fill_time ~ irs_st_2$form_type + irs_st_2$tax_payer)
+summary(anova_irs_2)
+```
+
+```{r question_2c_anova_inf,echo=FALSE}
+cat("Since the p-value (2.2e-10) is less than our significance value (0.05), we can reject our null hypothesis and conclude that the mean fill time of atleast 1 form type is different from one of others")
+```
+
+# 2.d
+```{r question_2d_anova,echo=FALSE}
+cat("Since different persons have different understanding capabilities as well as writing capabilities, experimenting the forms with different people isn't a great solution. So, experimenting same set of people with all the different forms would remove those dependencies theoretically while statstically we are reducing the SSE by introducing with the SSB (blocking error).\n***We can also see that the taxpayer p value  (2e-16) that its significantly having the different means suggesting the blocking is effective***")
+```
+
+```{r "IRS 2 Tukey's test"}
+TukeyHSD(anova_irs_2, which = 'irs_st_2$form_type', ordered=TRUE)
+plot(TukeyHSD(anova_irs_2, which = 'irs_st_2$form_type', ordered=TRUE), las = 1)
+sprintf("test")
+```
+
+
+# 2.e
+```{r question_2e_tukey}
+tukey_2e <- TukeyHSD(anova_irs_2,which = 'irs_st_2$form_type')
+tukey_2e
+```
+
+
+
+```{r question_2e_tukey_plot}
+plot(TukeyHSD(anova_irs_2, which = 'irs_st_2$form_type'), las = 1)
+```
+
+```{r question_2e_result,echo=FALSE}
+cat("The fill times for the (Form 4 and Form 1), (Form 3 and Form 1), (Form 4 and Form 1), (Form 3 and Form 2), (Form 4 and Form 2) and (Form 4 and Form 3) are different")
+```
+
+# 2.f
+```{r question_2f_result,echo=FALSE}
+cat("Since the introduction of the block design we reduced the residual error (SSE). Essentially the (MSE) decreasing while increasing the F-value so we are able to capture the difference in means more effectively and that's the reason we have more number of differences compared to the question 1. \n***Simply, the efficiency of the capturing the differences between the means of fill times between the form types increased by using Randomized Block Design compared to the Completely Randomzied Design***")
+
+```
+
+# 2.g
+```{r question_2g_result,echo=FALSE}
+cat("While using the RBD design the SSE value is 5764, but with the CRD design we have SSE as 111480, the fall in the SSE value is due to introducing the block design which is capturing the majority of the residual variation (SSB).\n***So the within variation (SSE) in question 2 has been reduced by the block design i.e. SSB***")
+```
+
+
+## Question 3
+```{r question_3_given, echo=FALSE}
+cat("Given: Experimentation was done based on people filling IRS tax returns forms by grouping at 3 income levels\nTo do: ANOVA hyothesis testing on the experimentation to determine if there any interactions")
+```
+
+```{r question_3_typeofdesign, echo=FALSE}
+cat("Complete Factorial Design (Two Factor ANOVA) has been followed for this experimentation design")
+```
+
+```{r question_3_load_dataset}
+irs_3 <- read.csv("IRS 3.csv") ##Load the dataset
+irs_3$Group <- factor(irs_3$Group)
+irs_st_3 <- cbind(irs_3[1], stack(irs_3[2:5]))
+
+
+colnames(irs_st_3) <- c("Group","fill_times","form_type")
+head(irs_st_3,1)
+```
+
+```{r question_3_summary}
+summary(irs_3)
+```
+# 3.a
+```{r question3a_result,echo=FALSE}
+cat("There are two factors in the experimental design.\n 1. Income Level Groups\n 2. Form Types")
+
+```
+# 3.b
+```{r question3b_result,echo=FALSE}
+cat("Under the income level groups factor, there are 3 levels:\n 1. Low Income\n 2. Next Income Bracker\n 3. Highest Bracket\nUnder the Form types factor there are 4 levels:\n 1. Form Type 1\n 2. Form Type 2\n 3. Form Type 3\n 4. Form Type 4")
+
+```
+
+# 3.c 
+```{r question3c_result,echo=FALSE}
+cat("There are total 12 treatments (4*3) in this Two Factor ANOVA Experimental Design")
+```
+
+# 3.d 
+
+```{r question_3d_check_normality,echo=FALSE}
+cat("Checking the normality condition")
+```
+
+```{r}
+lm_model_3 <- lm(irs_st_3$fill_times ~ irs_st_3$Group + irs_st_3$form_type + irs_st_3$Group*irs_st_3$form_type)
+resid_irs_3 <- residuals(lm_model_3)
+pred_irs_3 <- predict(lm_model_3)
+```
+
+
+```{r question_3a_residual_plots, figures-side, fig.show="hold", out.width="50%", echo=FALSE}
+### Normality test: Histogram
+hist(resid_irs_3)
+
+### Normality test: Normal Quantile Plot
+qqnorm(resid_irs_3)
+qqline(resid_irs_3)
+```
+
+```{r question_3d_stat_test}
+irs_and_dr_3 <- nortest::ad.test(resid_irs_3) ## Anderson Darling Test
+irs_and_dr_3
+```
+
+```{r question_3d_result_summary,echo=FALSE}
+sprintf("As the p-value (%.3f) from Anderson Darling Test to check normality is greater than our significance value, we failed to reject the null hypothesis i.e. data is sampled from the normally distributed population\n Moreover the Q-Q plots and histogram plots of the residuals suggest the same",irs_and_dr_3$p.value)
+```
+
+```{r question_3d_var_initial_context,echo=FALSE}
+cat("Checking the variances among the form type filling times and Income Levels")
+```
+
+```{r question_3d_var_initial, figures-side, fig.show="hold", out.width="33%", echo=FALSE}
+ggplot(irs_st_3, aes(x=form_type,y=fill_times)) + geom_boxplot(outlier.colour="red") + labs(title="Fill time for all form types",x="Forms",y="Fill Times") 
+
+ggplot(irs_st_3, aes(x=Group,y=fill_times)) + geom_boxplot(outlier.colour="red") + labs(title="Fill time for all Income Group Types",x="Group Types",y="Fill Times")
+
+plot(pred_irs_3, resid_irs_3)
+```
+
+```{r question_3d_var_stat_test}
+irs_3_levens <- car::leveneTest(irs_st_3$fill_time ~ irs_st_3$form_type*irs_st_3$Group)
+irs_3_levens
+```
+
+```{r question_3d_var_summary_results,echo=FALSE}
+cat(sprintf("As the p-value (%.3f) from Levenes Test to check variance constant condition is greater than our significance value, we failed to reject the null hypothesis i.e. there is constant variance among the groups\nMoreover the boxplots suggest not a big difference in variances among the different form type fill times",irs_3_levens$`Pr(>F)`[1]))
+```
+```{r question_3d_hypothesis_int, echo=FALSE}
+cat("Hypothesis to test the interaction")
+```
+
+**Hypothesis:**<br />
+<br>$H_{o}$ : Form Type and Income Group do not interact to affect the filling times of the tax forms
+<br>$H_{1}$ : Form Type and Income Group interact to affect the filling times of the tax forms
+
+```{r question_3d_annova,echo=FALSE}
+anova_model_3 <- aov(irs_st_3$fill_times ~ irs_st_3$form_type + irs_st_3$Group + irs_st_3$Group*irs_st_3$form_type)
+summary(anova_model_3)
+```
+```{r question_3d_annova_int_result,echo=FALSE}
+cat("Th p-value for the Group and Form Type level is 0.403 greater than the significance value (0.05). So, we fail to reject null hypothesis and conclude that the Form Type and Income Group do not interact to affect the filling times of the tax forms")
+```
+```{r question_3d_interaction_plot}
+interaction.plot(irs_st_3$form_type,irs_st_3$Group,irs_st_3$fill_times)
+```
+```{r question_3d_interaction_sum,echo=FALSE}
+cat("Although we could some minor overlap/interaction between the form type and income group, it's not a significant and moreover the interaction p-value is significantly high to say that the there is no interaction between the two factors")
+```
+
+
+# 3.e
+
+**Hypothesis:**<br />
+<br>$H_{o}$ : $\mu_{1}$ $=$ $\mu_{2}$ $=$ $\mu_{3}$ $=$ $\mu_{4}$<br />
+<br>$H_{1}$ : Atleast one mean is different
+
+```{r question_3e_hypothesis_result,echo=FALSE}
+cat("The p-value for Gender is 0.059 is greater than the significance level (0.05). So, we fail to reject the null hypothesis and conclude that form type has no effect on the form filling times")
+```
+
+# 3.f
+
+**Hypothesis:**<br />
+<br>$H_{o}$ : $\mu_{1}$ $=$ $\mu_{2}$ $=$ $\mu_{3}$<br />
+<br>$H_{1}$ : Atleast one mean is different
+
+```{r question_3f_hypothesis_result,echo=FALSE}
+cat("The p-value for Gender is 0.020 is less than the significance level (0.05). So, we reject the null hypothesis and conclude that income bracket has effect on the form filling times")
+```
+
+## Question 4
+```{r question_4_given, echo=FALSE}
+cat("Given: Experimentation was on done 5 different detergents claiming white washes at different temperatures\nTo do: ANOVA hyothesis testing on the experimentation to determine if there any interactions between detergents and temperatures")
+```
+
+```{r question_4_typeofdesign, echo=FALSE}
+cat("Two factor ANOVA has been followed for this experimentation design")
+```
+
+```{r question_4_load_dataset}
+det_4 <- read.csv("Detergents.csv") ##Load the dataset
+
+det_4$Temperature <- factor(det_4$Temperature)
+det_st_4 <- cbind(det_4[1], stack(det_4[2:6]))
+
+colnames(det_st_4) <- c("temperature","scores","detergents")
+head(det_st_4,1)
+```
+
+```{r question_4_summary}
+summary(det_4)
+```
+# 4.a
+```{r question4a_result,echo=FALSE}
+cat("There are two factors in the experimental design.\n 1. Detergents\n 2. Water Temperature Code")
+
+```
+
+# 4.b
+```{r question4b_result,echo=FALSE}
+cat("Under the Detergents groups factor, there are 5 levels:\n 1. Detergent 1\n 2. Detergent 2\n 3. Detergent 3\n 4. Detergent 4\n 5. Detergent 5\nUnder the Water temperature codes factor there are 3 levels:\n 1. Cold \n 2. Hot \n 3. Warm")
+
+```
+
+# 4.c 
+```{r question4c_result,echo=FALSE}
+cat("There are total 15 treatments (5*3) in this Two Factor Experimental Design")
+```
+
+# 4.d 
+```{r question_4d_norm}
+lm_model_4 <- lm(det_st_4$scores ~ det_st_4$temperature*det_st_4$detergents)
+resid_det_4 <- residuals(lm_model_4)
+pred_det_4 <- predict(lm_model_4)
+```
+
+```{r question_4d_residual_plots, figures-side, fig.show="hold", out.width="50%", echo=FALSE}
+### Normality test: Histogram
+hist(resid_det_4)
+
+### Normality test: Normal Quantile Plot
+qqnorm(resid_det_4)
+qqline(resid_det_4)
+```
+
+```{r question_4d_stat_test}
+det_and_dr_4 <- nortest::ad.test(resid_det_4) ## Anderson Darling Test
+det_and_dr_4
+```
+
+```{r question_4d_result_summary,echo=FALSE}
+sprintf("As the p-value (%.3f) from Anderson Darling Test to check normality is greater than our significance value, we failed to reject the null hypothesis i.e. data is sampled from the normally distributed population\n Moreover the Q-Q plots and histogram plots of the residuals suggest the same",det_and_dr_4$p.value)
+```
+
+```{r question_4d_var_initial_context,echo=FALSE}
+cat("Variances among the form type filling times")
+```
+
+```{r question_4d_var_initial, figures-side, fig.show="hold", out.width="33%", echo=FALSE}
+ggplot(det_st_4, aes(x=temperature,y=scores)) + geom_boxplot(outlier.colour="red") + labs(title="Scores across Temperatures",x="Temperatures",y="Scores") 
+
+ggplot(det_st_4, aes(x=detergents,y=scores)) + geom_boxplot(outlier.colour="red") + labs(title="Scores across Detergents",x="Detergents",y="Scores") 
+
+plot(pred_det_4, resid_det_4)
+```
+
+```{r question_4d_var_stat_test}
+det_levens <- car::leveneTest(det_st_4$scores ~ det_st_4$temperature*det_st_4$detergents)
+det_levens
+```
+
+```{r question_4d_var_summary_results,echo=FALSE}
+cat(sprintf("As the p-value (%.3f) from Levenes Test to check variance constant condition is greater than our significance value, we failed to reject the null hypothesis i.e. there is constant variance among the groups\nMoreover the boxplots suggest not a big difference in variances among the different form type fill times",det_levens$`Pr(>F)`[1]))
+```
+
+```{r question_4d_hypothesis_int, echo=FALSE}
+cat("Hypothesis to test the interaction")
+```
+
+**Hypothesis:**<br />
+<br>$H_{o}$ : Temperatures and Detergents do not interact to affect scores
+<br>$H_{1}$ : Temperatures and Detergents interact to affect scores
+
+```{r question_4d_annova,echo=FALSE}
+anova_model_4 <- aov(det_st_4$scores ~ det_st_4$temperature + det_st_4$detergents + det_st_4$temperature*det_st_4$detergents)
+summary(anova_model_4)
+```
+
+```{r question_4d_annova_int_result,echo=FALSE}
+cat("Th p-value for the Temperature and Detergents interaction level is 0.008 lesser than the significance value (0.05). So, we reject null hypothesis and conclude that the Temperatures and Detergents interact to affect scores of the detergents")
+```
+
+```{r question_4d_interaction_plot}
+interaction.plot(det_st_4$temperature,det_st_4$detergents ,det_st_4$scores)
+```
+```{r question 4e_overlap_exp,echo=FALSE}
+cat("As you can see there is significant overlap of the different detergents across different temperatures")
+```
+
+
+# 4.e
+```{r question_4e_int_result, echo=FALSE}
+cat("Since we already have the interaction effect, there would be no need to test the main effects, as the combination had the effect it makes no sense to check the main effects")
+```
+
+# 4.f
+```{r question_4f_result, echo=FALSE}
+cat("No need to conduct the hypothesis testing for the temperatures and detergents effect on the whiteness scores")
+
+```
+

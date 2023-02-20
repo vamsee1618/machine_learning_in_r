@@ -1,0 +1,378 @@
+---
+title: "BAX-441 002 Homework -3"
+subtitle: "Statistical Exploration and Reasoning"
+author:
+- Vamsee Krishna Reddy Narahari
+output: html_document
+date: '2022-11-13'    
+---
+
+```{r setup, include=FALSE}
+options(warn=-1) ##Ignoring the warnings
+knitr::opts_chunk$set(echo = TRUE)
+#load required libraries
+list.of.packages <- c("ggplot2", "readr","dplyr","psych","data.table","knitr","kableExtra","tidyverse","lubridate","gmodels","gridExtra","reshape2")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
+
+library("readr")
+library("dplyr")
+library("psych")
+library("ggplot2")
+library("data.table")
+library("knitr")
+library("kableExtra")
+library("tidyverse")
+library("lubridate")
+library("gmodels")
+library("gridExtra")
+library("reshape2")
+```
+
+## Question-1
+```{r question_1_load_data}
+df_electronics <- read.csv("Electronics.csv")
+head(df_electronics,2)
+```
+
+```{r question_1_variables_creation}
+df_electronics$street <- ifelse(df_electronics$Location == "Street", 1,0)
+df_electronics$mall <- ifelse(df_electronics$Location == "Mall", 1,0)
+df_electronics$downtown <- ifelse(df_electronics$Location == "Downtown", 1,0)
+```
+
+```{r question_1_model}
+electronics_model <- lm(Sales ~ Households + mall + downtown, data =df_electronics)
+summary(electronics_model)
+```
+```{r question1_model_inter,echo=FALSE}
+cat("Since the values are in thousands we need to multiply the coefficients with the 1000 to draw the interpretations.\nHolding the location of the store constant, for every 1000 number of households increase, there will be 868 dollars increase in the sales.\nControlling the household variable, the average sales in the street would be 14978 dollars.\nControlling the household variable, the average sales in the mall would be 43352 dollars.\nControlling the household variables, the average sales in the downtown would be 21842 dollars.\nNote:The difference in average sales of street and downtown are not significantly different, holding the household constant")
+```
+
+
+```{r question_1_conf_interval}
+confint(electronics_model,level = 0.95)
+```
+```{r question_1_conf_interval_interpretation,echo=FALSE}
+cat("Since the values are in thousands we need to multiply the coefficients with the 1000 to draw the interpretations.\nHolding the location of the store constant, the 95% confidence interval is ($779.47,$957.7).\nControlling the households variables, the 95% confidence interval for street is ($1357,$28598).\nControlling the households variables, the 95% confidence interval for mall than street is ($18554,$38193).\nControlling the households variables,the 95% confidence interval for mall than street is ($-3635,$17363) .")
+```
+
+## Question-2
+```{r question_2_data_load}
+df_winter <- read.csv("WinterFun.csv")
+head(df_winter,2)
+```
+
+# 2.a
+$y = \beta_{1} + \beta_{2}*time + \epsilon$
+```{r question2}
+sales_t <- lm(SALES ~ TIME, data = df_winter)
+summary(sales_t)
+```
+# 2.b 
+```{r question_2b_plot}
+plot( df_winter$TIME, df_winter$SALES,
+     type = "l",
+     xlab = "Time",
+     ylab = "Sales (in thousands)",
+     main = "Sales of Winter Sports",
+     col = "red")
+abline(sales_t)
+```
+```{r,echo=FALSE}
+cat("While there is general trend line of sales over time, we can see clear pattern of ups and downs visually. So, we can clearly see that there is seasonality in the given sales data. Seasonality is something we see same patters for certain time over years.")
+```
+
+#2.c 
+```{r question_2c}
+df_winter$q1 <- ifelse(df_winter$QUARTER == "1", 1, 0)   
+df_winter$q2  <- ifelse(df_winter$QUARTER == "2", 1, 0)
+df_winter$q3  <- ifelse(df_winter$QUARTER == "3", 1, 0)
+df_winter$q4  <- ifelse(df_winter$QUARTER == "4", 1, 0)
+head(df_winter,5)
+```
+
+#2.d
+
+Reduced model: $y = \beta_{0} + \beta_{1}*time + \epsilon$
+Full model: $y = \beta_{0} + \beta_{1}*time + \beta_{2}*Q2 + \beta_{3}*Q3 + \beta_{4}*Q4 + \epsilon$
+
+**Hypothesis:**<br />
+<br>$H_{o}$ : $\beta_{Q2}$ $=$ $\beta_{Q3}$ $=$ $\beta_{Q4}$ $=$ 0 <br />
+<br>$H_{1}$ : At least one beta(i) is not equal to zero.
+```{r question_2d}
+sales_t_full <- lm(SALES ~ TIME + q2 + q3 + q4, data = df_winter)
+summary(sales_t_full)
+```
+
+```{r partial_f_test}
+anova(sales_t,sales_t_full)
+```
+```{r partial_f_test_interpretation,echo=FALSE}
+cat("Since the p-value is less than the significance value, we would be rejecting the null hypothesis and conclude that the seasonlity indicator variables are significantly explaining the variation in the sales. And we need to include the seasonality variables in the model")
+```
+
+```{r partial_r}
+anova(sales_t)
+anova(sales_t_full)
+partial_r_square <- (9622 - 1810)/9622
+```
+
+```{r partial_r_sq, echo=FALSE}
+cat("The partial coefficient of determination is 81.2% suggests that the proportion of the unexplained in the timeseries model is 81.2% explained by the seasonality indicator variables")
+```
+## Question-3
+```{r question3_loaddata}
+df_empdisc <- read.csv("EmploymentDiscrimination.csv")
+head(df_empdisc,2)
+```
+
+# 3.a
+```{r variables_creation}
+df_empdisc$male <- ifelse(df_empdisc$GENDER == "MALE", 1, 0) 
+df_empdisc$female <- ifelse(df_empdisc$GENDER == "FEMALE", 1, 0) 
+```
+
+$y = \beta_{0} + \beta_{1}*educat + \beta_{2}*male_dummy +\epsilon$
+```{r 3a_model}
+empdisc_3a <- lm(SALARY ~ EDUCAT + male, data=df_empdisc)
+summary(empdisc_3a)
+```
+#3.b
+```{r question_3b, echo=FALSE}
+cat("Keeping the genders constant, as the education level increases by 1 unit, the salary increases by $81.\nHolding the education level constant, the average salary for the female employees is 4173 dollars and the average salary for the male employees is 4865 dollars.\nAs the p-value is very less than the significance value for the male dummy variable, we can conclude that the there is gender descrimination in the department")
+```
+# 3.c
+$y = \beta_{0} + \beta_{1}*educat + \beta_{2}*male_dummy + \beta_{3}*male_dummy*educat  + \epsilon$
+```{r question_3c}
+empdisc_3c <- lm(SALARY ~ EDUCAT + male + EDUCAT:male, data=df_empdisc)
+summary(empdisc_3c)
+```
+```{r que_3c_inter,echo=FALSE}
+cat("Since the p-value is higher than the significance value, we can conclude that the there is no effect of gender on salary depend on the level of education")
+```
+
+# 3.d
+```{r que_3d_plots}
+DiscCase_Males <- subset(df_empdisc, df_empdisc$GENDER == "MALE")
+DiscCase_Females <- subset(df_empdisc, df_empdisc$GENDER == "FEMALE")
+
+plot(df_empdisc$EDUCAT, df_empdisc$SALARY, 
+     main = "Education and Salary",
+     xlab = "Experience (in years)",
+     ylab = "Salary",
+     col = ifelse(df_empdisc$GENDER == "Male", "blue", "red"))
+legend("topleft", 
+       pch = c(1, 1), 
+       c("Female", "Male"), 
+       col = c("red", "blue"),
+       cex = 0.5)
+
+abline(lm(DiscCase_Females$SALARY ~ DiscCase_Females$EDUCAT), col = "red")
+abline(lm(DiscCase_Males$SALARY ~ DiscCase_Males$EDUCAT), col = "blue")
+```
+```{r question_3d_nature, echo=FALSE}
+cat("The two regression are dissimilar in nature")
+```
+
+#3.e
+```{r question_3e,echo=FALSE}
+cat("Looking at the adjusted R squares and model standard error the interaction model looks better than the 1st model by marginality.Both the models are valid with the model p-value being less than the significance value. The individual partial coefficients p-values of the 1st model are less than the significance value suggesting that the variables are significantly explaining the variation in the salaries. But coming to the interaction model the p-values of the partial coefficients are not significant as we introduced the interaction term into the model. As the interaction term is relatively not significant, it's unnecessary to add that into model and loose the interpretation value for the remaining coefficients.")
+```
+#3.f
+```{r question_3f}
+anova(empdisc_3a,empdisc_3c)
+```
+**Hypothesis:**<br />
+<br>$H_{o}$ : $\beta_{male}$ $=$ $\beta_{male:educat}$ $=$ 0 <br />
+<br>$H_{1}$ : At least one beta(i) is not equal to zero.
+```{r question_3f_inter,echo=FALSE}
+model_reduced_3f <- lm(SALARY ~ EDUCAT, data=df_empdisc)
+summary(model_reduced_3f)
+```
+```{r question_3f_model_exp}
+anova(model_reduced_3f,empdisc_3c)
+```
+```{r question_3f_interpretation,echo=FALSE}
+cat("As the p-value is less than the significance value, we can conclude that the atleast one of the gender dummy variable or interaction had significant effect on the salaries of the employees.")
+```
+#3.g
+```{r question_3g,echo=FALSE}
+cat("From the global p-value, we can say that interaction model is statistically significant. Additionally, by theory, education would have an impact on the salary. As the Education level increases males had higher increase in salaries when compared to females. \nTherefore, We can consider the Full model")
+```
+# Question-4
+```{r question4_loaddata}
+df_videoconf <- read.csv("Downloads.csv")
+colnames(df_videoconf) <- c("time","size","vendor")
+head(df_videoconf,2)
+```
+```{r var_creation_que4}
+df_videoconf$ms <- ifelse(df_videoconf$vendor == "MS", 1, 0) 
+df_videoconf$np <- ifelse(df_videoconf$vendor == "NP", 1, 0) 
+```
+
+```{r que4_model_1}
+model_que4 <- lm(time ~ size + np,data=df_videoconf)
+summary(model_que4)
+```
+```{r model_inter_1_que4,echo=FALSE}
+cat("Keeping the vendor constant, as the file size increases by 1 unit, the transfer time would increase by 0.3 seconds. Controlling the file size, the vendor MS system takes an average of 4.5 seconds for file transfer and the vendor np takes average of 5.5 seconds more than vendor ms")
+```
+
+```{r model_interaction_que4}
+model_que4_intr <- lm(time ~ size + np + size:np,data=df_videoconf)
+summary(model_que4_intr)
+```
+```{r}
+DiscCase_ms <- subset(df_videoconf, df_videoconf$vendor == "MS")
+DiscCase_np <- subset(df_videoconf, df_videoconf$vendor == "NP")
+
+plot(df_videoconf$size, df_videoconf$time, 
+     main = "Vendor and Transfer Times",
+     xlab = "Size (in MB)",
+     ylab = "Time (in Seconds)",
+     col = ifelse(df_videoconf$vendor == "MS", "blue", "red"))
+legend("topleft", 
+       pch = c(1, 1), 
+       c("MS", "NP"), 
+       col = c("blue", "red"),
+       cex = 0.5)
+
+abline(lm(DiscCase_np$time ~ DiscCase_np$size), col = "red")
+abline(lm(DiscCase_ms$time ~ DiscCase_ms$size), col = "blue")
+```
+
+
+```{r question_4_int_inter,echo=FALSE}
+cat("As the p-value of the interaction term is less than the significance value, we can say that the each vendor has different file transfer time for different file sizes.\nFrom the interaction model we can measure the average time spend relative to file size for MS is 9.66 seconds and np is 4.89 seconds. And for 1 MB increase in size the ms would take 0.22 seconds and np would take 0.4 seconds. So, we can recommend that the NP vendor would be good fit for the given file range (20-100 MB)")
+```
+
+# Question-5
+```{r ques5_dataload}
+df_fisher <- read.csv("Fisher Index.csv")
+head(df_fisher,2)
+```
+
+```{r model_5}
+mod_fish_ret <- lm(Y ~ X,data = df_fisher)
+summary(mod_fish_ret)
+```
+```{r que5_mod_int}
+mod_ret_int <- lm( Y ~ X -1, data = df_fisher)
+summary(mod_ret_int)
+```
+```{r que5_raw_rsq}
+raw_rsquared <- sum((df_fisher$Y*df_fisher$X))^2/(sum(df_fisher$Y^2)*sum(df_fisher$X^2))
+raw_rsquared
+```
+
+```{r que5_exp,echo=FALSE}
+cat("The regression through origin model has better R2 (computer raw square) than the other model, so it describes that the interceptless model is better explaining the model than the other one. As both the models are valid based on their p-value less than the significance value, and the theory accepts the model through origin as well, we can accept the model through origin for analysis")
+```
+
+# Question-6
+```{r que6_dataload}
+df_corpfin <- read.csv("CorporateFinancials.csv")
+
+head(df_corpfin,2)
+```
+
+# 6.a
+```{r model6}
+corpfin_model <- lm(Dividend~After_Tax_Profit,data = df_corpfin)
+summary(corpfin_model)
+```
+```{r model6a_exp,echo=FALSE}
+cat("As the p-value less than the significance value, we can conclude that the model was valid in explaining the variation of dividends through profits. And the individual coefficient t-value is also significant, we can say that the there is a relationship between the profits and dividends")
+```
+# 6.b
+```{r model6b_varcre}
+df_corpfin$q1 <- ifelse(df_corpfin$Quarter == "1", 1, 0)   
+df_corpfin$q2  <- ifelse(df_corpfin$Quarter == "2", 1, 0)
+df_corpfin$q3  <- ifelse(df_corpfin$Quarter == "3", 1, 0)
+df_corpfin$q4  <- ifelse(df_corpfin$Quarter == "4", 1, 0)
+head(df_corpfin,2)
+```
+
+```{r model6b}
+model_6b_1 <- lm(df_corpfin$Dividend ~ df_corpfin$q2 + df_corpfin$q3 + df_corpfin$q4)
+summary(model_6b_1)
+```
+```{r}
+summary(lm(df_corpfin$Dividend ~  df_corpfin$q2 + df_corpfin$q3 + df_corpfin$q4))
+```
+
+
+```{r model6b_2}
+model_6b_2 <- lm(df_corpfin$Dividend ~  df_corpfin$After_Tax_Profit*df_corpfin$q2 + df_corpfin$After_Tax_Profit*df_corpfin$q3 + df_corpfin$After_Tax_Profit*df_corpfin$q4)
+summary(model_6b_2)
+```
+```{r}
+df_corpfin$time <- paste(df_corpfin$Year,paste("-",df_corpfin$Quarter))
+
+ggplot(data = df_corpfin) +
+  geom_line(mapping = aes(x= time, y = Dividend, group = 1))+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
+
+
+```{r}
+cat("The interaction terms would capture the differences in slopes and intercepts from quarter to quarter. The above model is significant.(Global p-value less than the significance). And individual dividends and quarters also signifies the same thing with individual p-value not being significant")
+```
+
+
+```{r,echo=FALSE}
+cat("From the above model results i.e. the p-values of the dummy seasonality variables greater than the significance value, so we can clearly say that the there is no seasonality pattern in the dividends. But it's not the primary theory, because companies tend to have some seasonality in the dividends since they tend to give more dividends during some of the quarters (generally q3-holiday season)")
+```
+
+
+# Question-7
+```{r question7_dataload}
+df_lawn <- read.csv("Mowers.csv")
+head(df_lawn,2)
+```
+
+$y_{sales} = \beta_{0} + \beta_{1}*temperature + \beta_{2}*advertising + \beta_{3}*discount  + \epsilon$
+```{r que7_model}
+model_lawn <- lm(Sales~Temperature + Advertising + Discount, data = df_lawn)
+summary(model_lawn)
+```
+**Joint Hypothesis:**<br />
+<br>$H_{o}$ : $\beta_{temperature}$ $=$ $\beta_{advertising}$ $=$ $\beta_{discount}$ $=$ 0 <br />
+<br>$H_{1}$ : At least one beta(i) is not equal to zero.
+
+**Temperature Hypothesis:**<br />
+<br>$H_{o}$ : $\beta_{temperature}$ $=$ 0 <br />
+<br>$H_{1}$ : $\beta_{temperature}$ $\neq$ 0 
+
+**Advertising Hypothesis:**<br />
+<br>$H_{o}$ : $\beta_{Advertising}$ $=$ 0 <br />
+<br>$H_{1}$ : $\beta_{Advertising}$ $\neq$ 0 
+
+**Discount Hypothesis:**<br />
+<br>$H_{o}$ : $\beta_{Discount}$ $=$ 0 <br />
+<br>$H_{1}$ : $\beta_{Discount}$ $\neq$ 0 
+
+```{r hypothesis_testing,echo=FALSE}
+cat("At 0.05 significance value, the model is extremely significant but the explanatory variables except the Advertising are statistically insignificant in explaining the variation of the sales.\nIn brief following are the results for the hypothesis testing:\nGlobal Test: p-value < alpha, reject null hypothesis, model valid\nTemperature t-test: p-value>alpha, failed to reject null hypothesis, not able to explain the variation in Sales\nAdvertising t-test:alpha, reject null hypothesis, temperature able to explain some part of the variation in sales\nDiscount t-test:p-value>alpha, failed to reject null hypothesis, not able to explain the variation in Sale")
+```
+```{r correlation_test}
+cor(df_lawn)
+```
+```{r correlation_test_result,echo=FALSE}
+cat("As we can see there is strong positive correlation between the Advertising and Temperature, Advertising and Discount")
+```
+
+
+```{r vif_test}
+car::vif(model_lawn)
+1/(1-0.9345)
+```
+```{r vif_test_result,echo=FALSE}
+cat("As the advertising vif value is greater than 10 and greater than 1/(1-R2) value, suggests multicollinearity exists between the variables.")
+```
+
+```{r explanation_que7, echo=FALSE}
+cat("Theoretically, advertising and temperature aren't related unless until there is some unexplained relation in the business process. So, whatever the correlation we might be seeing maybe due to mere coincidence and eliminating variable might not be a good ideaand cause Omitted variable bias . Also, we would increase the chances of specification bias by volunteerly removing the variables since it might be again a coincidence")
+```
+

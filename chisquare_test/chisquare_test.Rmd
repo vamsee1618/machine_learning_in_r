@@ -1,0 +1,225 @@
+---
+title: "BAX-441 002 Homework -1"
+subtitle: "Statistical Exploration and Reasoning"
+author:
+- Vamsee Krishna Reddy Narahari
+output: html_document
+date: '2022-10-07'
+---
+
+```{r setup, include=FALSE}
+options(warn=-1) ##Ignoring the warnings
+knitr::opts_chunk$set(echo = TRUE)
+#load required libraries
+list.of.packages <- c("ggplot2", "readr","dplyr","psych","data.table","knitr","kableExtra","tidyverse","lubridate","gmodels","gridExtra","reshape2")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
+
+library("readr")
+library("dplyr")
+library("psych")
+library("ggplot2")
+library("data.table")
+library("knitr")
+library("kableExtra")
+library("tidyverse")
+library("lubridate")
+library("gmodels")
+library("gridExtra")
+library("reshape2")
+```
+
+## Question 1
+
+```{r question1_load_data}
+obs_count <- c(18,19,56,128,178,66,23,16)
+exp_count <- c(10.02,31.24,76.16,121.42,126.61,86.37,38.53,13.66)
+sample_mean <- 0.0009874
+sample_sd <- 0.0151
+```
+
+# 1.a 
+```{r question_1a_result, echo=FALSE}
+cat("There is lot of deviation at the high frequency areas and the data also have extreme outliers. Probably the data is not in normal distribution")
+```
+
+# 1.b 
+```{r question_1b_result, echo=FALSE}
+cat("As we go to the extremes of the returns, the frequency of in the intervals decreasing drastically, if we have further intervals, the required condition of having mininum 5 count would be violated. The fact that having count(n) low would decrease the expected value and it might increase the chi-square, increasing the chances of false rejecting the Null Hypothesis (Type-1 error)")
+```
+# 1.c
+```{r question_1c_1, echo=FALSE}
+cat("Motivation: To test whether if the returns are from a normally distributed data\nType of Data: The actual observations are continuous but they are grouped and normalized so categorical\nLevel of Measuremen: Categorical\nStatistical test to use: Chi-square goodness of fit test")
+```
+```{r question_1c_2}
+exp_p_1 <- pnorm(-0.03, mean = sample_mean, sd = sample_sd, lower.tail = TRUE)
+exp_p_2 <- pnorm(-0.02, mean = sample_mean, sd = sample_sd, lower.tail = TRUE) - pnorm(-0.03, mean = sample_mean, sd = sample_sd, lower.tail = TRUE)
+exp_p_3 <- pnorm(-0.01, mean = sample_mean, sd = sample_sd, lower.tail = TRUE) - pnorm(-0.02, mean = sample_mean, sd = sample_sd, lower.tail = TRUE)
+exp_p_4 <- pnorm(0, mean = sample_mean, sd = sample_sd, lower.tail = TRUE) - pnorm(-0.01, mean = sample_mean, sd = sample_sd, lower.tail = TRUE)
+exp_p_5 <- pnorm(0.01, mean = sample_mean, sd = sample_sd, lower.tail = TRUE) - pnorm(0, mean = sample_mean, sd = sample_sd, lower.tail = TRUE)
+exp_p_6 <- pnorm(0.02, mean = sample_mean, sd = sample_sd, lower.tail = TRUE) - pnorm(0.01, mean = sample_mean, sd = sample_sd, lower.tail = TRUE)
+exp_p_7 <- pnorm(0.03, mean = sample_mean, sd = sample_sd, lower.tail = TRUE) - pnorm(0.02, mean = sample_mean, sd = sample_sd, lower.tail = TRUE)
+exp_p_8 <- pnorm(0.03, mean = sample_mean, sd = sample_sd, lower.tail = FALSE)
+exp_prob <- c(exp_p_1,exp_p_2,exp_p_3,exp_p_4,exp_p_5,exp_p_6,exp_p_7,exp_p_8)
+cat(exp_prob)
+```
+
+
+**Hypothesis:**<br />
+<br>$H_{o}$ : $p_{1}$ $=$ 0.02 and $p_{2}$ $=$ 0.06 and $p_{3}$ $=$ 0.15 and $p_{4}$ $=$ 0.24 and $p_{5}$ $=$ 0.25 and $p_{6}$ $=$ 0.17 and $p_{7}$ $=$ 0.07 and $p_{8}$ $=$ 0.02<br />
+<br>$H_{1}$ : one of the or all of the probabilities are different
+
+```{r question_1c_3, echo=FALSE}
+cat("Null Hypothesis: Returns are from Normally Distributed Data\nAlternate Hypothesis: Returns are not from normally distributed")
+```
+
+```{r question_1c_4}
+result_que_1 <- chisq.test(x = obs_count, p = exp_prob)
+```
+
+```{r question_1c_5}
+### The actual degrees of freedom should be 2.
+### n intervals minus 1 minus # of parameters to be estimated = 8 - 1 - 2 = 5.
+pchisq(result_que_1$statistic, 5, lower.tail = FALSE)
+```
+```{r question_1c, echo=FALSE}
+cat("Decision: As the p-value less than any significance value, we can reject the null hypothesis\nInterpretation: The returns of the index are not from the normally distributed data")
+```
+
+# 1.d
+```{r question_1d,echo=FALSE}
+cat("Yes, the Q-Q plot conveys same story as the chi-square goodness of fit test that the data is not normally distributed")
+```
+# 1.e 
+```{r question_1e,echo=FALSE}
+cat("Advantage of Q-Q plot: Q-Q plot displays the data in granular form, we can see all points on the graph and judge the distribution of the data while histogram bin width and bins might cover it up.\nAdvantage of Chi-Square test: Visualizations cannot provide any significance, a lot depends upon the type of graph and chosen and interpretation and conclusion from the graphs wouldn't meet the needs. So, we need a statistical inference to conclude about the given claim")
+
+```
+
+## Question 2
+```{r question_2_load_dataset}
+que2_data <- read.csv("Stock Market.csv")
+```
+
+# 2.a
+```{r question_2_1,echo=FALSE}
+cat("Motivation: To test whether a certain day of week performs better than the other day. If the proportion of stock market up for a certain day is significantly better than the other\nLevel of Measuremen: Categorical\nStatistical test to use: Chi-square Contigency Table test")
+```
+
+**Hypothesis:**<br />
+<br>$H_{o}$ : $p_{m}$ $=$ $p_{t}$ $=$ $p_{w}$ $=$ $p_{th}$ $=$ $p_{f}$<br />
+<br>$H_{1}$ : $p_{m}$,$p_{t}$,$p_{w}$,$p_{th}$,$p_{f}$ are not all equal
+
+```{r question_2_2, echo=FALSE}
+cat("Null Hypothesis: Ups and downs of the stock market across the days have equal proportion\nAlternate Hypothesis: Ups and downs of the stock market across the days are not all equal")
+```
+
+```{r question_2_3}
+number_of_days <- c(rep("Down",41), rep("Down",42), rep("Down",39), rep("Down", 37), rep("Down", 45),
+                   rep("Up", 59),rep("Up", 55), rep("Up", 52), rep("Up",57), rep("Up",52))
+
+days_per_week <- c(rep("Monday",41), rep("Tuesday",42), rep("Wednesday",39), rep("Thursday", 37), rep("Friday", 45),
+                  rep("Monday", 59),rep("Tuesday", 55), rep("Wednesday", 52), rep("Thursday",57), rep("Friday",52))
+
+que_2_mod <- data.frame(direction = number_of_days, days_of_week = days_per_week )
+que_2_mod$days_of_week <- factor(que_2_mod$days_of_week,levels=c("Monday", "Tuesday", "Wednesday", "Thursday","Friday"))
+head(que_2_mod,2)
+```
+
+```{r question2a_4}
+result_que2 <- chisq.test(que_2_mod$direction,que_2_mod$days_of_week, correct = FALSE)
+result_que2
+```
+
+```{r question2a_5}
+mosaicplot(~ days_of_week+direction, data = que_2_mod, 
+           main = "Mosaic Plot", xlab = "Week Day", ylab = "Direction",color=c(2,4))
+```
+
+```{r question_2a_result,echo=FALSE}
+cat("Decision: As the p-value greater than any significance value, we fail to reject the null hypothesis\nInterpretation: The ups and down of the market doesn't really depend upon the day of the week")
+```
+# 2b
+```{r question_2b, echo=FALSE}
+cat("If we check the proportion of positives of each day to be 0.5, we are just infering about that certain day but we are not developing any relation between two or more days. To develop a relation between days, we need to use Chi-Square test. Even if our statistical test infer proportion to be 0.5 for all days, the alpha error across the days would rise to the power of 5 (Chances of getting Type 1 error increases)")
+```
+
+
+```{r question_2b_2}
+prop_1 <- prop.test(59, 59+41, p = 0.5, alternative = "two.sided", correct=FALSE)
+prop_2 <- prop.test(55, 55+42, p = 0.5, alternative = "two.sided", correct=FALSE)
+prop_3 <- prop.test(52, 52+39, p = 0.5, alternative = "two.sided", correct=FALSE)
+prop_4 <- prop.test(57, 57+37, p = 0.5, alternative = "two.sided", correct=FALSE)
+prop_5 <- prop.test(52, 52+45, p = 0.5, alternative = "two.sided", correct=FALSE)
+cat("All the p-values except for Thursday tend to be higher than the significance value i.e. higher than the 0.05, so we are failed to reject the null hypothesis for all of them but not for Thursday. So, Thursday has some bias to the up or down. The results of the chi-square contradicting to the individual prop tests.")
+```
+
+
+# 2c
+```{r question_2c, echo=FALSE}
+cat("We won't be able to quantify the strength of association on each day even if there is some assosciation between the ups and downs and days. How correlated are those specifc variables are, we cannot just act upon knowing the direction but to decide the investment we might need to know the strength of relationship")
+```
+
+## Question 3
+```{r question_3_load_data}
+que_3_data <- read.csv("GSS2014.csv")
+```
+
+```{r question_3_1, echo=FALSE}
+cat("Motivation: To test whether if the representatives of the survey has large representation of certain education level\nType of Data: Highest education level studied\nLevel of Measuremen: Categorical\nStatistical test to use: Chi-square goodness of fit test")
+```
+**Hypothesis:**<br />
+<br>$H_{o}$ : Proportion of representatives at all education levels are equal
+<br>$H_{1}$ : one of the or all of the proportions are different
+
+```{r question_3_dataset_prep}
+que_3_data %>% count(DEGREE)
+```
+
+
+```{r question_3_2}
+obs_dataset <- c(330,1269,186,472+281) # One null value
+exp_p <- c(0.123,0.296,0.194,0.386) + 0.00025 # Addition to make it one
+```
+
+
+```{r question_3_3}
+chisq.test(x = obs_dataset, p = exp_p)
+```
+```{r question_3_4,echo=FALSE}
+cat("Decision: As the p-value is significantly low, we can reject the null hypothesis\nInterpretation: Yes, the survey has been overly representated atleast one education category")
+```
+
+## Question 4
+```{r question_4,load_dataset}
+que_4_data <- read.csv("GSS2014.csv")
+```
+
+```{r question_4_data_manip, echo=FALSE}
+que_4_data$BORN <- as.character(que_4_data$BORN)
+que_4_data$DEGREE <- as.character(que_4_data$DEGREE)
+```
+
+```{r question_4_1, echo=FALSE}
+cat("Motivation: To check for any relationship between degree attainment and whether they born in US\nLevel of Measuremen: Categorical\nStatistical test to use: Chi-square Contigency Table test or proportion test")
+```
+
+**Hypothesis:**<br />
+<br>$H_{o}$ : $p_{1}$ $=$ $p_{2}$ $=$ $p_{3}$ $=$ $p_{4}$ $=$ $p_{5}$ <br />
+<br>$H_{1}$ : $p_{1}$,$p_{2}$,$p_{3}$,$p_{4}$,$p_{5}$ are not equal
+
+```{r question_4_2}
+chisq.test(que_4_data$DEGREE, que_4_data$BORN, correct = FALSE)
+```
+
+
+```{r question_4_3}
+mosaicplot(~ DEGREE+BORN, data = que_4_data, 
+           main = "Mosaic Plot", xlab = "DEGREE", ylab = "BORN",color=c(2,4))
+```
+
+```{r question_4_4, echo=FALSE}
+cat("Decision: As the p-value is less than the significance value, we can reject the null hypothesis\nInterpretation: There is relationship between their birth in US and degree attainment")
+
+```
+

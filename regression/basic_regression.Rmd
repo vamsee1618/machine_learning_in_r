@@ -1,0 +1,266 @@
+---
+title: "BAX-441 002 Homework -2"
+subtitle: "Statistical Exploration and Reasoning"
+author:
+- Vamsee Krishna Reddy Narahari
+output: html_document
+date: '2022-10-14'    
+---
+
+```{r setup, include=FALSE}
+options(warn=-1) ##Ignoring the warnings
+knitr::opts_chunk$set(echo = TRUE)
+#load required libraries
+list.of.packages <- c("ggplot2", "readr","dplyr","psych","data.table","knitr","kableExtra","tidyverse","lubridate","gmodels","gridExtra","reshape2")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
+
+library("readr")
+library("dplyr")
+library("psych")
+library("ggplot2")
+library("data.table")
+library("knitr")
+library("kableExtra")
+library("tidyverse")
+library("lubridate")
+library("gmodels")
+library("gridExtra")
+library("reshape2")
+```
+
+## Question-1
+```{r que_1_load_data}
+que1_data <- read.csv("Display Space.csv")
+head(que1_data,2)
+```
+
+
+
+# 1.a
+```{r que_1_plot}
+plot(que1_data$Display.Feet, que1_data$Sales, 
+     main = "Sales vs Display Size", 
+     xlab = "Diplay Size", ylab = "Sales") 
+abline(lm(que1_data$Sales~que1_data$Display.Feet))
+scatter.smooth(x=que1_data$Display.Feet, y=que1_data$Sales, main="Sales ~ Display")
+```
+
+```{r que_1_plot_exp,echo=FALSE}
+cat("The scatter plot suggests that there is non-linearity between the Sales and display feet (size) due to the tails of the data. There should be positive relationship between the Sales and display feet as the display of a product increases the chances of consumer looking at it increases implying sales increases but there should be minimum visibility of the customer to buy and at one point it won't matter how much the product displayed")
+```
+
+# 1.b
+```{r que_1b_model}
+price_disp_lm <- lm(que1_data$Sales~que1_data$Display.Feet)
+
+anova(price_disp_lm)
+summary(price_disp_lm)
+```
+```{r que_1b_model_exp,echo=FALSE}
+cat("As the p-value way less than the significance value, we can say with significance that the display size and sales are linearly related. But looking at the regression equation i.e. Sales = 93.03 + 39.76*DisplayFeet, even when the display feet is zero then there is sales of 93.03 doesn't make much of sense. The slope of the equation showcases that every 1 feet increase in the display the sales would increase by 39.76 dollars.")
+```
+
+# 1.c
+```{r que_1c_tukey,echo=FALSE}
+cat("As we saw non-linearity in the scatter plot, tukey's bulging role suggests a log or reciprocal transformation on the independent variable")
+```
+
+
+```{r que_1c_trans}
+plot(log(que1_data$Display.Feet), que1_data$Sales, 
+     main = "Sales vs Log Display Size", 
+     xlab = "Log Diplay Size", ylab = "Sales") 
+abline(lm(que1_data$Sales~log(que1_data$Display.Feet)))
+```
+```{r que_1c_plot_exp,echo=FALSE}
+cat("Post log transformation on the display size, the regression line better fits into the dataset and it looks more linear than without transformation")
+
+```
+
+```{r que_1c_lm_log}
+pri_disp_log <- lm(que1_data$Sales~log(que1_data$Display.Feet))
+summary(pri_disp_log)
+```
+```{r que_1c_lm_log_exp,echo=FALSE}
+cat("The slope of the regression equation provides that for the 1 logarthmic unit increase in the display feet the sales increases by 138 dollars and the intercept displays the constant sales when the product has the display size of 1.")
+```
+
+# 1.d
+```{r que_1d_model,echo=FALSE}
+cat("From the squared-R value and adjusted R-squre value of independent variable transformed regression is much higher than the other one suggesting that post transformation the model was able to explain the  sales much better.The same story with the residual standard error (precision) as well, it has the lower value implying that the new regression line fits better to the data points. The transformation applied model part 1.c suggests a better way to recognise the pattern of the data")
+```
+
+## Question 2
+
+# 2.a
+
+```{r que_2a_load}
+que2_data <- read.csv("CommunityBanks.csv")
+colnames(que2_data)[3] ="ROAA"
+colnames(que2_data)[4] ="efficiency_ratio"
+colnames(que2_data)[5] ="risk_capital_ratio"
+head(que2_data,2)
+```
+
+
+```{r que_2b_scat}
+plot(que2_data[,c(3:5)])
+```
+```{r que_2a_reg_plot_exp, echo=FALSE}
+cat("As the plot between the eisk capital ratio and roaa is bit concentrated at a particular point, applying transformation might help us to have better linearity")
+```
+```{r que2a_reg_plot_trans,echo=FALSE}
+plot(que2_data$risk_capital_ratio,que2_data$ROAA)
+abline(lm(que2_data$ROAA~que2_data$risk_capital_ratio))
+
+plot(log(que2_data$risk_capital_ratio),log(que2_data$ROAA))
+abline(lm(log(que2_data$ROAA)~log(que2_data$risk_capital_ratio)))
+
+plot(que2_data$risk_capital_ratio,log(que2_data$ROAA))
+abline(lm(log(que2_data$ROAA)~(que2_data$risk_capital_ratio)))
+```
+
+```{r que_2a_tran_exp,echo=FALSE}
+cat("Since the transformation isn't helping spread the data properly and as the data itself has so much deviation, to avoid complexity in the model, no transformation has been applied")
+```
+
+```{r que_2a_reg_eq,echo=FALSE}
+cat("The multiple regression equation for predicting/analysing the ROAA(%) is:")
+```
+
+ROAA (%) = $\beta_{o}$ + $\beta_{1}$ * efficiency ratio (%) + $\beta_{2}$ * total risk-based capital (%)
+
+# question 2b
+```{r que_2b_reg_model}
+que2_reg_mod <- lm(ROAA ~ efficiency_ratio + risk_capital_ratio, data = que2_data)
+summary(que2_reg_mod)
+```
+
+# question 2c
+
+
+**Hypothesis:**<br />
+<br>$H_{o}$ : $\beta_{1}$ $=$ $\beta_{2}$ $=$ 0 <br />
+<br>$H_{1}$ : At least one beta(i) is not equal to zero.
+
+```{r que_2c_reg_model,echo=FALSE}
+cat("As the p-value less than the significance value, we can reject the null hypothesis. Thus we can comment that the model is valid, and either efficiency ratio or risk capital ratio or both would help us in explaining the roaa.")
+```
+
+# 2.d
+```{r que_2d}
+#Other way of calculating p-values
+t_test_stat_1 <- (-0.011730 - 0)/0.002196
+p_value_1 <- pt(t_test_stat_1,196,lower.tail = TRUE)
+
+t_test_stat_2 <- (0.028612 - 0)/0.005399
+p_value_2 <- pt(t_test_stat_2,196,lower.tail = TRUE)
+```
+
+**Hypothesis_1:**<br />
+<br>$H_{o}$ : $\beta_{1}$ $=$ 0 <br />
+<br>$H_{1}$ : $\beta_{1}$ $\neq$ 0 
+
+**Hypothesis_2:**<br />
+<br>$H_{o}$ : $\beta_{2}$ $=$ 0 <br />
+<br>$H_{1}$ : $\beta_{2}$ $\neq$ 0 
+
+```{r que_2d_exp,echo=FALSE}
+cat("As the p-values for both the tests are 2.54e-07 and 3.11e-07 which is less than the significance value, we can reject the null hypothesis of both the tests and conclude both the variables would help to describe the model")
+```
+
+
+# 2.e
+```{r que_2e,echo=FALSE}
+cat("The beta_1 suggests that for every 1 unit change in the efficiency ratio, the roaa value decreases by 0.0117 and beta_2 suggests that for every 1 unit change in the capital risk ratio, the roaa value increases by 0.028")
+
+```
+# 2.f
+```{r que_2f}
+anova(que2_reg_mod)
+```
+
+```{r que_2f_ans}
+r_sqr <- (3.7275+2.1995)/(15.3521+3.7275+2.1995)
+```
+
+```{r que_2f_ans_exp,echo=FALSE}
+sprintf("The value for the coefficient of multiple determination from the model summary and calculated is %.2f %% The 27.85 percent of the variation of the roaa is explained by the model",r_sqr*100)
+
+```
+# 2.g
+```{r que_2g}
+adj_r_sq <- 1-((1-r_sqr)*((199-1)/(199-2-1)))
+```
+
+```{r que_2g_exp, echo=FALSE}
+sprintf("The adjusted r-squared value is %.2f %%",adj_r_sq*100)
+```
+# 2.h
+```{r que_2h}
+predict(que2_reg_mod, data.frame(efficiency_ratio = 60, risk_capital_ratio = 15), interval = "confidence", level = 0.95)
+```
+```{r que_2h_exp,echo=FALSE}
+cat("The confidence interval for the provided values is 1.07-1.16")
+
+```
+
+# 2.i
+```{r que_2i}
+predict(que2_reg_mod, data.frame(efficiency_ratio = 60, risk_capital_ratio = 15), interval = "prediction", level = 0.95)
+```
+```{r que_2i_exp,echo=FALSE}
+cat("The confidence interval for the provided values is 0.5678616 - 1.674866")
+```
+
+## Question 3
+```{r que3_load_data}
+que3_data <- read.csv("MedicalCo.csv")
+head(que3_data,2)
+```
+
+```{r que3_plot_data}
+plot(que3_data)
+```
+
+```{r que3_model}
+que3_mod <- lm(SALES ~ ADV + BONUS + MKTSHR + COMPET,que3_data)
+summary(que3_mod)
+```
+```{r que3_model_red}
+que3_mod_red <- lm(SALES ~ ADV + BONUS,que3_data) 
+summary(que3_mod_red)
+```
+
+```{r que3_model_disp_models}
+anova(que3_mod)
+anova(que3_mod_red)
+```
+
+```{r que_state_hypo,echo=FALSE}
+cat("H0: The reduced model and the full model do not differ significantly\nH1: The full model is significantly better.")
+```
+
+```{r que3_model_sse_cal}
+sse_ful <- 175855
+sse_red <- 181176
+k <- 4
+l <- 2
+n <- 25
+
+f_value <- ((181176-175855)/2)/8793
+req_pvalue <- pf(f_value,2,25-4-1,lower.tail = FALSE)
+```
+
+```{r que3_mdoel_sse_exp,echo=FALSE}
+cat("As the p-value (0.74) greater than the significance value, we failed to reject the null hypothesis. The full model is not significantly better than the reduced model so the two variables X3 and X4 significantly doesn't influence Y (Market share and Largest competitor share doesn't have significant impact on the sales)")
+```
+
+```{r que3_model_r_cal}
+part_r <- (181176-175855)/181176
+```
+```{r model_final_qye3,echo=FALSE}
+cat("The proportion of variation in Sales(Y) is explained by these two variables that is not explained by X1 and X2 alone is 2.94%")
+```
+

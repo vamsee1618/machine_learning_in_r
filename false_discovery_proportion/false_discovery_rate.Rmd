@@ -1,0 +1,208 @@
+---
+author: "Vamsee Krishna Reddy Narahari"
+date: "2023-01-10"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+options(warn=-1) ##Ignoring the warnings
+knitr::opts_chunk$set(echo = TRUE)
+#load required libraries
+list.of.packages <- c("ggplot2", "readr","dplyr","psych","data.table","knitr","kableExtra","tidyverse","lubridate","gmodels","gridExtra","reshape2","fastDummies")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
+
+library("readr")
+library("dplyr")
+library("psych")
+library("ggplot2")
+library("data.table")
+library("knitr")
+library("kableExtra")
+library("tidyverse")
+library("lubridate")
+library("gmodels")
+library("gridExtra")
+library("reshape2")
+library("fastDummies")
+```
+
+#### This markdown helps us to understand the False Discovery Proportion by analyzing the randomized normal distribution samples
+
+```{r,echo = FALSE}
+cat("Creating a sample dataframe with 1001 columns and 10000 rows of normalized samples")
+```
+
+```{r}
+#To make this example reproducible
+set.seed(0143)
+#dataframe with normal dist as columns
+df_norm <- data.frame(replicate(1001,sample(rnorm(10000))))
+```
+
+```{r,echo = FALSE}
+cat("Run regression on first column as Y and remaining as the X variables")
+```
+
+```{r,echo=FALSE}
+cat("Since these are standardized variables (normalized samples), technically the means of every column tends to be 0, so the regression line will pass through the origin, but due to the random sample its not exactly 0 so restricting the model to be interceptless")
+```
+
+```{r}
+model_norm <- lm(X1 ~ 0+ ., data=df_norm)
+```
+
+```{r}
+hist(summary(model_norm)$coefficients[,4])
+#It almost looks like a Uniform distribution
+```
+```{r,echo=FALSE}
+cat("The p-values of the coefficients almost looks like a uniform distribution")
+```
+
+```{r, echo=FALSE}
+cat("In general case, there shouldn't be any significant values since the values are randomly generated, there shouldn't be any relationship between the independent and dependent variables")
+```
+
+
+```{r}
+sum(summary(model_norm)$coefficients[,4]<0.01) ## To check how many variables are less than the 0.01 significance
+```
+```{r}
+cat("There are 10 variables that are found as significant that is 0.01% of the variables. It show cases that by random some of the variables can be found as significant even though they are not i.e. False Discoveries and FDP is 100%")
+```
+### BH Procedure
+```{r}
+pvals <- sort(summary(model_norm)$coefficients[,4]) ### Create a list for all the p-values
+N <- length(pvals) ## Total Length of the P-Values
+q <- 0.1 ## False Discovery Rate to be less than 0.1
+
+
+alpha_int <- c()
+for (i in 1:1000){
+  if(pvals[i]<= (q*(i/N))){
+    alpha_int <- alpha_int.append(pvals[i])
+  }
+}
+alpha_int
+```
+
+```{r}
+min(pvals) <= 0.1*(1/1000) ### To check if minimum of p-values is greater than the first cutoff value
+```
+
+```{r}
+cat("The minimum values of the p-values is greater than the first cut-off value, we can't create a BH p-value cutoff. So, therefore we can conclude that none of the X-variables are significant post FDR cut-off introduction. There are no true discoveries")
+```
+
+### Auto-Analysis
+```{r}
+df_raw_auto <- read.csv("autos.csv") ## Load the dataset 
+head(df_raw_auto,2)
+```
+
+```{r}
+summary(df_raw_auto)
+```
+```{r,echo=FALSE}
+cat("Following are the points from initial EDA:\n1.The given dataset is highly imbalanced across mutliple categories such as the make, fuel type etc. So the metric to evaluate the price across categories would be the mean rather than the sum of the prices.")
+```
+```{r}
+boxplot(df_raw_auto$price)
+```
+
+
+```{r}
+ggplot(df_raw_auto, aes(make,price)) +           # ggplot2 barplot with mean
+  geom_bar(position = "dodge",
+           stat = "summary",
+           fun = "mean") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
+
+```{r}
+library("plotly")                                                 # Load plotly package
+df_heat <- select_if(df_raw_auto,is.numeric)
+cormat <- round(cor(df_heat),2)
+melted_cormat <- melt(cormat)
+ggplot(data = melted_cormat, aes(x=Var1, y=Var2, fill=value)) + 
+  geom_tile() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  scale_fill_gradient(low="white", high="dark grey") 
+```
+```{r,echo=FALSE}
+cat("1. Length, Width, Curb Weight, Engine Size, Bore, Horse Power are positively correlated with the price\n2. City milegae and highway mileage have negative correlation with the price\n3. Some technical details of a car such as Length, Width, CUrb Weight etc., are highly correlated within themselves")
+```
+```{r}
+scatter.smooth(df_raw_auto$length, df_raw_auto$price, lpars = list(col = "blue", lwd = 3, lty = 3))
+abline(lm(df_raw_auto$price~df_raw_auto$length), col='red',lwd=3)
+scatter.smooth(df_raw_auto$highway_mpg, df_raw_auto$price, lpars = list(col = "blue", lwd = 3, lty = 3))
+abline(lm(df_raw_auto$price~df_raw_auto$highway_mpg), col='red',lwd=3)
+scatter.smooth(df_raw_auto$city_mpg, df_raw_auto$price, lpars = list(col = "blue", lwd = 3, lty = 3))
+abline(lm(df_raw_auto$price~df_raw_auto$city_mpg), col='red',lwd=3)
+```
+
+```{r,echo=FALSE}
+cat("The length and mileage variables are quadratic in nature with respect to price")
+```
+
+
+```{r}
+df_auto <- dummy_cols(df_raw_auto,remove_first_dummy = TRUE, remove_selected_columns = TRUE) ### Create the Dummy Variables
+```
+
+```{r}
+model_auto <- lm(price ~.,data=df_auto) #Model
+```
+
+```{r}
+summary(model_auto) ## Model Summary
+```
+```{r,echo=FALSE}
+cat("Regression Notes:\n1.There are two singularities i.e. high correlation between compresssion ratio and dummy variable of fuel system idi and engine type ohcf is highly correlated with another dummy variable make subaru. It won't be making much sense to remove a certain dummy variable from the model due to this reason.\n2.The Global F-test of the model suggests that the model is significant relatively havhing high R-squared.\n3.Moreover, there are number of significant variables at alpha 0.05\n4. While adding the quadratic terms of the length, mileage variables the independent variables are not significant and avoided them in the equation")
+```
+```{r}
+hist(summary(model_auto)$coefficients[,4])
+```
+```{r}
+pvalues_auto <- summary(model_auto)$coefficients[,4]
+sum(pvalues_auto < 0.05)
+```
+```{r,echo=FALSE}
+cat("Due to the more number of dummy variables and relatively large number of explanatory variables, there might be a chance that the independent variables might be significant due to a random chance. At 0.1 significance, there are 27 variables which are significant but it might be completely due to random chance and there might be irrelevant variables. Like some of the make dummy variables are significant but not the others, it might be due to a random chance. In the future, whether to predict the price to set the price of the car there might be incorrect prediction from this model, where we are providing unnecessary weightage to certain variables")
+```
+
+
+```{r}
+fdr <- function(pvals, q, plotit=FALSE){ 
+  pvals <- pvals[!is.na(pvals)]
+  N <- length(pvals)
+  
+  k <- rank(pvals, ties.method="min")
+  alpha <- max(pvals[ pvals <= (q*k/N) ])
+  
+  if(plotit){
+    sig <- factor(pvals <= alpha)
+    o <- order(pvals)
+    plot(pvals[o], log="xy", col=c("grey60","red")[sig[o]], pch=20, 
+      ylab="p-values", xlab="tests ordered by p-value", main = paste('FDR =',q))
+    lines(1:N, q*(1:N) / N)
+  }
+  
+  return(alpha)
+}
+cutoff_alpha <- fdr(pvalues_auto,q=0.1,plotit=TRUE)
+```
+```{r}
+sprintf("The cut-off value from the BH procedure is %.4f",cutoff_alpha)
+```
+
+
+
+```{r}
+sum(pvalues_auto<=cutoff_alpha)
+pvalues_auto<=cutoff_alpha
+```
+
+```{r,echo=FALSE}
+cat("There are about 19 variables which are excepted to be True discoveries and at 0.05 significance value there are 4 false discoveries")
+```
+

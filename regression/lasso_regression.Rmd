@@ -1,0 +1,256 @@
+---
+title: "Machine Learning - Assignment 3"
+author: "Vamsee Krishna Reddy Narahari"
+date: "2023-01-26"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+options(warn=-1) ##Ignoring the warnings
+knitr::opts_chunk$set(echo = TRUE)
+#load required libraries
+list.of.packages <- c("ggplot2", "readr","dplyr","psych","data.table","knitr","kableExtra","tidyverse","lubridate","gmodels","gridExtra","reshape2","rsample")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
+
+library("readr")
+library("dplyr")
+library("psych")
+library("ggplot2")
+library("data.table")
+library("knitr")
+library("kableExtra")
+library("tidyverse")
+library("lubridate")
+library("gmodels")
+library("gridExtra")
+library("reshape2")
+library("ISLR")
+library(car)
+library(caret)
+library(glmnet)
+```
+
+## Question-1 
+```{r}
+#Load the dataset
+df_heart <- read.csv("heart.csv")
+```
+
+```{r}
+#Check of the columns
+head(df_heart,1)
+```
+```{r}
+#Data Summary
+summary(df_heart)
+```
+```{r}
+## Count of the missing values column wise
+sapply(df_heart, function(x) sum(is.na(x)))
+```
+
+```{r,echo=FALSE}
+cat("While the total number of rows in the provided data sample are 240, the columns family_record, past record, wrist_dim are almost empty columns. So we can exclude those columns from the analysis")
+```
+```{r}
+df_heart <- subset(df_heart, select = -c(wrist_dim,family_record,past_record) )
+```
+
+
+
+```{r,echo=FALSE}
+cat("For the columns height, fat_free_wt, chest_dim, hip_dim, thigh_dim, biceps_dim have very few missing values, and all of the missing values are in different observations. So, we could replace the NA values with mean/median for simple analysis based on their distribution")
+```
+
+```{r,fig.show='hold',out.width="33%"}
+hist(df_heart$height,breaks = 20)
+hist(df_heart$fat_free_wt,breaks = 20)
+hist(df_heart$chest_dim)
+hist(df_heart$hip_dim)
+hist(df_heart$thigh_dim)
+hist(df_heart$biceps_dim)
+```
+```{r}
+cat("Since all of the variables are nearly in normal distribution with couple of outliers, we could impute the missing values with mean values")
+```
+
+
+```{r}
+
+for(i in 1:ncol(df_heart)) {
+  df_heart[ , i][is.na(df_heart[ , i])] <- mean(df_heart[ , i], na.rm = TRUE)
+}
+head(df_heart) # Check first 6 rows after substitution by mean
+```
+
+
+```{r}
+hist(df_heart$heart_attack,breaks=20)
+```
+```{r,echo=FALSE}
+cat("Normally, for numerical target variables, we generally check if the distribution of the train and test are representative of the entire sample. So, as of now the heart attack probabilities are on the approximate normal distribution. Randomizing the sample subsetting and checking the their distributions would be enough in this scenario")
+```
+
+
+```{r}
+set.seed(1439)
+index <- createDataPartition(df_heart$heart_attack, p = 0.8, list = FALSE)
+df_heart_train <- df_heart[index, ]
+df_heart_test <- df_heart[-index, ]
+```
+
+```{r}
+hist(df_heart_train$heart_attack,breaks=20)
+hist(df_heart_test$heart_attack,breaks=10)
+```
+
+```{r,echo=FALSE}
+cat("As we see the histogram plots of the train and test are almost identitical the original sample")
+```
+
+```{r}
+model_heart <- lm(heart_attack~.,data=df_heart_train)
+summary(model_heart)
+```
+
+```{r,echo=FALSE}
+cat("The model is significant since the p-value is less than any other significant value. An R-squared value of 0.9325 means that 93.25% of the variation in heart attacks is explained by the independent variables in the model. The independent variables weight, neck_dim, chest_dim, abdom_dim, thigh_dim and knee_dim are significant at 5% level of significance.")
+```
+
+```{r}
+predictions <- predict(model_heart, newdata = subset(df_heart_test, select = -c(heart_attack)))
+
+# calculate residuals
+residuals <- df_heart_test$heart_attack - predictions
+
+# calculate total sum of squares
+total_ss <- sum((df_heart_test$heart_attack - mean(df_heart_train$heart_attack))^2)
+
+residual_ss <- sum(residuals^2)
+
+r_squared <- 1 - (residual_ss / total_ss)
+r_squared
+```
+```{r,echo=FALSE}
+cat("The true out of sample rsquared is around 92.45% for the linear regression model")
+```
+## Question-2
+```{r,echo=FALSE}
+cat("Cross validation used to evaluate the performance of a model by sampling the data into training and test sets multiple times. CV method is also applied for complex models parameter tuning. Some of the well known methods are K-fold CV, where K-1 folds are used to train the model and 1 fold is used to test the model on the data. It would ideally provide much more confidence on the model since we are having chekcing the every data point in the dataset to be train and test and evaluating the performanc of the model\nThe key problems associated with the CV are heavy computation requried, if the dataset is to big and it involves transformers and vectors as the features, it would require lot of computation power. Heavy computation inturn is expensive and time-consuming. There can be high variation in a large sample in the performances of the models due to the variability in the sample subsetting.")
+```
+
+## Question-3
+```{r}
+set.seed("0143")
+model_heart_cv <- train(heart_attack ~ ., data = df_heart_train, method = "lm", trControl = trainControl(method = "cv", number = 8))
+```
+
+```{r}
+model_heart_cv$results[, "Rsquared"]
+```
+```{r,echo=FALSE}
+cat("The mean rsquared of the Cross Validation is 87.4% (Validation dataset Rsquared). Since there is a decent drop in the rsquared from the original training rsquared and test rsquared it might be possible that the model is overfitting to the data and capturing the unnecessary noise in the data. We might have to apply regularization methodologies to overcome the issue.")
+```
+```{r}
+### OSS Rsquared
+predictions_cv <- predict(model_heart_cv, newdata = subset(df_heart_test, select = -c(heart_attack)))
+
+# calculate residuals
+residuals_cv <- df_heart_test$heart_attack - predictions_cv
+
+# calculate total sum of squares
+total_ss <- sum((df_heart_test$heart_attack - mean(df_heart_train$heart_attack))^2)
+
+residual_ss_cv <- sum(residuals_cv^2)
+
+r_squared_cv <- 1 - (residual_ss_cv / total_ss)
+r_squared_cv
+```
+
+
+## QUeston-4
+
+```{r,echo=FALSE}
+cat("Lasso regression is a methodology applied when there is high number of explanatory variables in the dataset and to avoid overfitting the model. In simple terms, the lasso regression adds a additional cost term i.e. absolute value of the coefficients to penalize the less important coefficients and shrink them to zero.  The absolute value of the coefficient is multiplied with lambda and added to the cost function (SSE). When the lambda increases the larger the penalization of the absolute of the coefficients.\nIt's much better than the anyother feature selection processes such as Forward, Backward etc because its automatic selects the best features to fit the model.\nOne problem with the lasso might be we might miss out on some of the significant features due to high correlation with another variable.\nThe regularization might be highly dependent on the lambda selected")
+```
+## Question-5
+```{r}
+# Create the matrix of predictors
+x_heart <- as.matrix(df_heart_train[, -17])
+y_heart <- df_heart_train[, "heart_attack"]
+heart_fit <- cv.glmnet(x_heart, y_heart, alpha = 1, nfolds = 8)
+
+lambda_min <- heart_fit$lambda.min
+lambda_1se <- heart_fit$lambda.1se
+
+lasso_min <- glmnet(x_heart, y_heart, alpha = 1, lambda = lambda_min)
+lasso_1se <- glmnet(x_heart, y_heart, alpha = 1, lambda = lambda_1se)
+```
+
+```{r}
+plot(heart_fit)
+```
+
+
+
+```{r}
+lasso_min
+```
+
+```{r}
+lasso_1se
+```
+
+```{r,echo=FALSE}
+cat("The lambda value that is one standard error away from the minimum of the mean cross-validated error can be choosen since this model might be balancing the trade-off between the model complexity and its performance. The model at the minimum can be sometimes overfit to the data and can't be great generalizer for the unseen data. Moreover the number of features used in the minimum lambda model will be lot more than the 1se model therefore increasing the complexity of the minimum model. Explicitly here the minimum lasso model is having parameters of 7 but the 1se lasso model is having parameters of 5. Although there isn't difference in the rsquared, we are getting a simpler model in the 1 se lasso model.")
+```
+
+## Question 5.2
+```{r}
+predictions_se <- predict(lasso_1se, as.matrix(df_heart_test[,-17]), type = "response")
+
+# calculate residuals
+residuals_se <- df_heart_test$heart_attack - predictions_se
+
+# calculate total sum of squares
+total_ss <- sum((df_heart_test$heart_attack - mean(df_heart_train$heart_attack))^2)
+
+residual_ss_se <- sum(residuals_se^2)
+
+r_squared_se <- 1 - (residual_ss_se / total_ss)
+r_squared_se
+```
+```{r}
+lasso_1se$beta
+```
+
+```{r}
+predictions_min <- predict(lasso_min, as.matrix(df_heart_test[,-17]), type = "response")
+
+# calculate residuals
+residuals_min <- df_heart_test$heart_attack - predictions_min
+
+# calculate total sum of squares
+total_ss <- sum((df_heart_test$heart_attack - mean(df_heart_train$heart_attack))^2)
+
+residual_ss_min <- sum(residuals_min^2)
+
+r_squared_min <- 1 - (residual_ss_min / total_ss)
+r_squared_min
+```
+```{r}
+lasso_min$beta
+```
+
+
+```{r,echo=FALSE}
+cat("While the lasso regression model of the 1 se lambda has the OSS Rsquared of 85.17% and min lambda has the OSS Rsquared of the 88.24%, although lasso models doesn't have lesser Rsquared than the normal regression model and CV model which has around 92% OSS Rsquared. Since we have only 5 parameters and getting a decent Rsquared, from the explanation of the above where we would prefer a simpler model but not an optimal one.")
+```
+
+
+## Question 6
+```{r,echo=FALSE}
+cat("AIC is a one more measure to evaluate the performance of the statistical model. So it is calculated by adding 2*degrees of freedom to the deviance. So, at the end it becomes a relative measure to the other models during the feature selection process, where degrees of freedom is the number of parameters in the given model. So if we have large number of parameters i.e. in case of BigData, we might overfit the model since due to the large parameters the df would increase drastically and AIC, in the process of minimizing the AIC, we might overfit the model to the given data. In these scenarios to avoid the overfit we can use the corrected AIC, where the cost function or AIC function added by factoring in the sample size and its difference with the number of parameters.")
+```
+
