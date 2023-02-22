@@ -1,0 +1,207 @@
+---
+title: "Machine Learning"
+author: "Vamsee Krishna Reddy Narahari"
+date: "2023-02-21"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+options(warn=-1) ##Ignoring the warnings
+knitr::opts_chunk$set(echo = TRUE)
+#load required libraries
+list.of.packages <- c("ggplot2", "readr","dplyr","psych","data.table","knitr","kableExtra","tidyverse","lubridate","gmodels","gridExtra","reshape2","rsample")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
+
+library("readr")
+library("dplyr")
+library("psych")
+library("ggplot2")
+library("data.table")
+library("knitr")
+library("kableExtra")
+library("tidyverse")
+library("lubridate")
+library("gmodels")
+library("gridExtra")
+library("reshape2")
+library("ISLR")
+library(randomForest)
+library(rpart)
+library(car)
+library(caret)
+library(glmnet)
+library(ISLR2)
+library(leaps)
+library(olsrr)
+library(MASS)
+library(faraway)
+library("ordinal")
+library("nortest")
+library(corrplot)
+library(Matrix)
+```
+
+## Question-1 
+### How PCA Works?
+```{r,echo=FALSE}
+cat("Principal Component Analysis is a technique used to reduce the number of variables in a dataset while retaining most of the variance in the data. It does this by transforming the original data to a uncorrelated variables called principal components.
+
+Here's how PCA works: 
+On higher level, PCA would find the hyperplane which explains the most variance in the data, and project the data-points to that particular plane provides the first principal component. The next principal components are found in similar fashion where the next hyperplane which explains the most variance i.e. diagonal to the first hyperplane.
+
+The mathematical process:
+1. Standardization of the data
+2. Computing the covariance matrix and calculating their eigen vectors and eigen values.(Single value decomposition)
+3. Then we would choose the components which explains the highest variance which can be found in the strength matrix
+")
+```
+
+### Limitations of PCA
+```{r,echo=FALSE}
+cat("Interpretability: Since we are getting the components from entirely a new dimension, it would be difficult to interpret them and find the relation between the variables
+
+Information loss: There is loss of information based upon the number of components you would be using.
+
+Linearity: PCA wouldn't perform that much on the non-linear data i.e. ellipsoid or spherical in nature
+")
+```
+
+## Question-2
+### Classification Tree Growth
+```{r,echo=FALSE}
+cat("Classification trees are grown by selecting the best variable to split on at each node based on a measure of impurity or information gain most commonly used impurity is the Gini score. The algorithm tries to find the split that maximizes the separation of the classes in the target variable.
+
+To grow a classification tree, the algorithm starts with the entire dataset at the root node and calculates the Gini index for each variable. The variable that results in the largest reduction in the Gini index is selected as the best split variable. The data is then split based on the selected variable, and the process is repeated for each child node until a stopping criterion is met or until the last leaf node.
+
+For the prediction, based on the given data, it would traverse through the tree and calculates the number of training classes available at that single point it would then calculate the probability for each class, the class which has the highest probability that would be the prediction")
+```
+
+### Regression Tree Growth
+```{r,echo=FALSE}
+cat("Regression trees are grown using a similar approach to classification trees, but instead of minimizing impurity, the goal is to minimize the sum of squared residuals or mean sum of squared residuals. This is done by selecting the best variable to split on at each node based on the reduction in the sse or mse that results from the split.
+
+In a similar fashion, the regression tree would start with the entire dataset at the root node and identifies the sse with every possible variable and all the data, identifying the variable and value that reduces the SSE the most would be the root node and then the process continues with the remaining data. This process continuess till we mentioned any regularization hyperparameter such as max depth or it continues till it identifies the last leaf node
+")
+```
+
+## Question-3
+### Tree pruning
+```{r,echo=FALSE}
+cat("Tree pruning is used to reduce the complexity of a decision tree by removing nodes that do not improve the accuracy of the model. The purpose of pruning is to prevent overfitting, which can occur when a decision tree is too complex and fits the training data too closely, resulting in poor generalization to new, unseen data. 
+Pruning involves growing the tree to its full size and then removing nodes that do not improve the accuracy of the model. This is done by recursively removing each node and its children and checking the effect on the accuracy of the model. If removing the node does not significantly reduce the accuracy of the model on a validation set, the node is pruned. We can use Cross Validation process to determine the accuracy of the model")
+```
+
+## QUestion-4
+### Why Random Forest works better than linear/logistic/lasso regression?
+```{r,echo=FALSE}
+cat("Random Forest is an ensemble learning method that combines multiple decision trees to improve the accuracy and stability of predictions. Random forests can be developed on multiple approaches such as bagging, gradient boosting etc. For example, bagging is the methodology where the multiple decision trees developed in a bootstrapping fashion increasing the accuracy. Since its not a single model and not a predefined number of parameters, it generally outperforms over logistic, linear and lasso regression. Also, random forests can be used to fit on non-linear data, no limitations of number of parameters and perform better on outliers where the other models wouldn't be performing better")
+```
+
+## Question-5
+```{r}
+df_trans <- read.csv("Transaction.csv")
+head(df_trans,2)
+```
+
+```{r}
+df_trans <- subset(df_trans, select = -ID)
+df_trans$payment_default <- factor(df_trans$payment_default)
+barchart(df_trans$payment_default)
+```
+
+```{r,echo=FALSE}
+cat("Note: The classes are highly imbalanced")
+```
+
+##### Split the dataframe to test and train
+```{r}
+set.seed(10)
+trainIndex <- sample(nrow(df_trans), 0.7 * nrow(iris))
+df_train <- df_trans[trainIndex, ]
+df_test <- df_trans[-trainIndex, ]
+```
+
+```{r,fig.width=20, fig.height=15}
+pairs(df_train,cex=1.5)
+```
+
+
+```{r}
+set.seed(10)
+model_trans <- rpart(payment_default ~ ., data = df_train, method = "class")
+model_trans
+```
+### Classification Tree
+```{r,fig.width=5, fig.height=8}
+plot(model_trans, uniform = TRUE, main = "Classification tree")
+text(model_trans, use.n = TRUE, all = TRUE, cex = 0.8)
+```
+```{r}
+predictions_trans <- predict(model_trans, df_test, type = "class")
+cm_trans <- confusionMatrix(predictions_trans, df_test$payment_default)
+cm_trans
+```
+
+```{r,echo=FALSE}
+cat("Recall of the Classification Tree model :", cm_trans$byClass["Recall"], "\n")
+cat("Precision of the Classification Tree model :", cm_trans$byClass["Precision"], "\n")
+```
+### Pruning the decision tree
+```{r}
+cp <- model_trans$cptable[which.min(model_trans$cptable[,"xerror"]),"CP"]
+model_pruned <- prune(model_trans, cp = cp)
+```
+
+```{r}
+printcp(model_pruned)
+```
+```{r}
+predictions_trans_p <- predict(model_pruned, df_test, type = "class")
+cm_trans_p <- confusionMatrix(predictions_trans_p, df_test$payment_default)
+cm_trans_p
+```
+```{r,echo=FALSE}
+cat("Recall of the Classification Tree model :", cm_trans_p$byClass["Recall"], "\n")
+cat("Precision of the Classification Tree model :", cm_trans_p$byClass["Precision"], "\n")
+```
+
+
+
+### Random Forest
+```{r}
+set.seed(10)
+model_rf <- randomForest(payment_default ~ ., data = df_train, ntree = 500)
+model_rf
+```
+
+```{r}
+predictions_rf <- predict(model_rf, df_test)
+confusion_matrix_rf <- confusionMatrix(predictions_rf, df_test$payment_default)
+confusion_matrix_rf
+```
+
+```{r,echo=FALSE}
+cat("Recall of the Random Forest model :", confusion_matrix_rf$byClass["Recall"], "\n")
+cat("Precision of the Random Forest model :", confusion_matrix_rf$byClass["Precision"], "\n")
+```
+
+```{r,fig.width=5, fig.height=6}
+varImpPlot(model_rf)
+```
+
+
+### Models Summary
+```{r,echo=FALSE}
+cat("Classification Tree (CART) (Unpruned): The decision tree has the accuracy on the test data is around 71%. From the decision, we can understand that the Payment Amount 4 has the highest feature importance and critical in explaining  or predicting the payment defaults and it is followed by Bill amount feature
+
+Classification Tree (Pruned): The pruned classification accuracy increased to 77% while its predicting the entire non-defaults accurately and has 23% error rate of predicting the payment default. The increase in performance might be due to avoiding the overfitting of the model on the train data and achieving better accuracy
+
+Random Forest: The random forest out of bag error rate of 21% while the test accuracy 79% which are almost same. Similarly to the classification tree, random forest also determines the payment amount 4 has the important variable in explaining the payment defaults
+
+Other notes:
+1. Based on the given model results, we could use Random forests model since it has better prediction in identifying the payment defaults
+2. Since the data is highly imbalanced we could use oversampling or smote on the data to improve the performance of the model\
+")
+```
+
